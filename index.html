@@ -598,7 +598,7 @@ async function apiGet(){
 }
 async function apiPost(entries){
   const body={password:session.pass,name:session.name,tasks:STATE.tasks,payments:STATE.payments,entries};
-  const r=await fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const r=await fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json','x-app-pass':session.pass},body:JSON.stringify(body)});
   if(r.status===403){throw new Error('403');}
   return r.json();
 }
@@ -618,13 +618,15 @@ async function pushSync(){
   if(sync.mode!=='server'||sync.busy)return;
   sync.busy=true;
   const entries=pendingEntries.splice(0,pendingEntries.length);
+  let okFlag=false;
   try{
     const res=await apiPost(entries);
-    if(res&&res.ok){sync.version=res.version;STATE.history=res.history||STATE.history;sync.dirty=false;
+    if(res&&res.ok){sync.version=res.version;STATE.history=res.history||STATE.history;sync.dirty=false;okFlag=true;
       setSyncUI('on');cacheLocal();if(tab==='historial')renderHistorial();}
     else{pendingEntries.unshift(...entries);setSyncUI('off');}
   }catch(e){pendingEntries.unshift(...entries);setSyncUI('off');}
   sync.busy=false;
+  if(!okFlag&&sync.mode==='server'){clearTimeout(sync.retry);sync.retry=setTimeout(pushSync,3000);}
 }
 function startPoll(){
   clearInterval(sync.poll);

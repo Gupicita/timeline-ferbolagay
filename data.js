@@ -18,10 +18,6 @@ async function readState(redis) {
   return raw; // upstash auto-parses JSON
 }
 
-function pass(req) {
-  return req.headers['x-app-pass'] || (req.query && req.query.pass) || '';
-}
-
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const redis = getRedis();
@@ -31,7 +27,13 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, configured: false });
   }
 
-  if (pass(req) !== APP_PASS) {
+  // Parse body early so we can also read the password from it (POST sends it in the body).
+  let body = req.body;
+  if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
+  body = body || {};
+
+  const provided = req.headers['x-app-pass'] || (req.query && req.query.pass) || body.password || '';
+  if (provided !== APP_PASS) {
     return res.status(403).json({ ok: false, error: 'clave incorrecta' });
   }
 
@@ -43,10 +45,6 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      let body = req.body;
-      if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
-      body = body || {};
-
       const country = req.headers['x-vercel-ip-country'] || '';
       const current = (await readState(redis)) || { version: 0, tasks: [], payments: [], history: [] };
       const version = (current.version || 0) + 1;
