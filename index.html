@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Timeline FerBolagay</title>
+<style>
+:root{
+  --bg:#0f1115;--panel:#181b22;--panel2:#1f232c;--line:#2a2f3a;
+  --txt:#e7e9ee;--muted:#9aa3b2;--accent:#6c8cff;--accent2:#4a6bff;
+  --done:#39d98a;--prog:#f5b544;--todo:#7a8296;--danger:#ff6b6b;--chip:#262b36;
+  --trueque:#c08bff;--cash:#5ec8ff;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg);color:var(--txt);font-size:14px;line-height:1.45}
+header{position:sticky;top:0;z-index:20;background:#12151bee;border-bottom:1px solid var(--line);
+  padding:10px 18px;backdrop-filter:blur(6px)}
+.hrow{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+h1{font-size:15px;margin:0;font-weight:650}
+h1 span{color:var(--muted);font-weight:400;font-size:12px}
+.spacer{flex:1}
+input,select,button,textarea{font-family:inherit;font-size:13px;color:var(--txt);
+  background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+button{cursor:pointer;transition:.15s}button:hover{border-color:var(--accent)}
+button.ghost{background:transparent}button.danger:hover{border-color:var(--danger);color:var(--danger)}
+button.primary{background:var(--accent2);border-color:var(--accent2);color:#fff;font-weight:600}
+.tabs{display:flex;gap:6px;margin-top:10px}
+.tab{padding:7px 16px;border-radius:8px 8px 0 0;background:transparent;border:1px solid transparent;
+  color:var(--muted);font-weight:600;cursor:pointer}
+.tab.active{color:var(--txt);background:var(--panel);border-color:var(--line);border-bottom-color:var(--panel)}
+.wrap{max-width:900px;margin:0 auto;padding:18px}
+.search{min-width:160px}
+
+/* checklist */
+.proj{margin-bottom:18px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+.proj-h{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;background:var(--panel2)}
+.proj-h h2{font-size:14px;margin:0;font-weight:650;flex:1}
+.proj-h .caret{color:var(--muted);transition:.2s}
+.proj.collapsed .caret{transform:rotate(-90deg)}
+.proj.collapsed .items{display:none}
+.proj-h .pm{font-size:12px;color:var(--muted)}
+.items{display:flex;flex-direction:column}
+.item{border-top:1px solid var(--line)}
+.item-row{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer}
+.item-row:hover{background:#1c202a}
+.item-row.dragging{opacity:.4}
+.item-row.drop-before{box-shadow:inset 0 3px 0 var(--accent)}
+.item-row.drop-after{box-shadow:inset 0 -3px 0 var(--accent)}
+.drag{color:#5a6474;cursor:grab;font-size:15px;flex-shrink:0;user-select:none;line-height:1}
+.drag:active{cursor:grabbing}
+.additem{margin:6px 14px 12px;background:transparent;border:1px dashed var(--line);color:var(--muted);
+  border-radius:8px;padding:9px;width:calc(100% - 28px);text-align:center;font-weight:600}
+.additem:hover{border-color:var(--accent);color:var(--accent)}
+.detbtns{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;border-top:1px dashed var(--line);padding-top:12px}
+.detbtns .spc{flex:1}
+.mini{padding:5px 10px;font-size:12px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--todo);flex-shrink:0}
+.dot.prog{background:var(--prog)}.dot.entregado{background:var(--done)}
+.item-title{flex:1;font-weight:550}
+.blk{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;white-space:nowrap;flex-shrink:0;letter-spacing:.3px}
+.chip-tr{font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;flex-shrink:0;
+  background:#2a1f3a;color:var(--trueque)}
+.chip-cash{font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;flex-shrink:0;
+  background:#0e2c3a;color:var(--cash)}
+.item-date{font-size:12px;color:var(--muted);white-space:nowrap}
+.pill{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap}
+.pill.todo{background:#2b3040;color:var(--todo)}
+.pill.prog{background:#3a2f14;color:var(--prog)}
+.pill.entregado{background:#173026;color:var(--done)}
+.price-tag{font-size:12px;color:var(--cash);font-weight:600;white-space:nowrap;min-width:52px;text-align:right}
+.price-tag.trueque{color:var(--trueque)}
+.icaret{color:var(--muted);font-size:11px;transition:.2s}
+.item.open .icaret{transform:rotate(90deg)}
+.detail{display:none;padding:4px 16px 16px 34px;background:#14171e;border-top:1px dashed var(--line)}
+.item.open .detail{display:block}
+.drow{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin:12px 0}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.field input,.field select{width:auto}
+.dur input{width:64px}.delay input{width:60px}.money-in{width:96px}
+.delay{display:flex;gap:6px;align-items:flex-end}
+.subgroup{margin-top:12px}
+.subgroup h4{margin:0 0 5px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.sub{display:flex;gap:8px;align-items:flex-start;padding:3px 0;font-size:13px}
+.sub input[type=checkbox]{margin-top:2px;accent-color:var(--done);cursor:pointer}
+.sub.done span{text-decoration:line-through;color:var(--muted)}
+.sub .sd{font-size:10px;color:var(--muted);white-space:nowrap;margin-top:1px}
+.priceline{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px;
+  border-top:1px dashed var(--line);padding-top:12px}
+.toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);user-select:none;cursor:pointer}
+.moved{color:var(--prog);font-size:11px}
+
+/* cuenta */
+.summary{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.scard{flex:1;min-width:150px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.scard .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.scard .v{font-size:26px;font-weight:700;margin-top:4px}
+.scard.bal .v.debe{color:var(--danger)}.scard.bal .v.favor{color:var(--done)}.scard.bal .v.aldia{color:var(--muted)}
+.scard .sub2{font-size:11px;color:var(--muted);margin-top:3px}
+.sec{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.sec h3{margin:0 0 10px;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;
+  letter-spacing:.4px;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid #21252e}
+td.amt{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+tr.settled td{color:var(--muted)}
+.tag{font-size:10px;padding:1px 7px;border-radius:999px;background:var(--chip);color:var(--muted);margin-left:6px}
+.tag.tr{color:var(--trueque);background:#2a1f3a}
+tr.settled td.amt{color:var(--trueque)}
+.cl{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.cl.fer{background:#123028;color:#5fd6a4}
+.cl.cfo{background:#1a2540;color:#7fa8ff}
+.payrow input{padding:5px 8px}
+.payadd{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:10px}
+.iconbtn{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:15px;padding:2px 6px}
+.iconbtn:hover{color:var(--danger)}
+.muted{color:var(--muted)}.right{text-align:right}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--accent2);color:#fff;
+  padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;transition:.3s;pointer-events:none;z-index:50}
+.toast.show{opacity:1}
+.hidden{display:none}
+
+/* login */
+.overlay{position:fixed;inset:0;z-index:100;background:#0b0d12;display:flex;align-items:center;justify-content:center;padding:20px}
+.login{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px;width:100%;max-width:360px}
+.login h2{margin:0 0 4px;font-size:18px}
+.login p{margin:0 0 18px;color:var(--muted);font-size:13px}
+.login label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:12px 0 5px}
+.login input{width:100%;padding:11px 12px;font-size:15px}
+.login button{width:100%;margin-top:18px;padding:12px}
+.login .err{color:var(--danger);font-size:12px;margin-top:10px;min-height:14px}
+
+/* sync status + user chip */
+.who{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.syncdot{width:8px;height:8px;border-radius:50%;background:var(--todo)}
+.syncdot.on{background:var(--done)}.syncdot.off{background:var(--danger)}.syncdot.local{background:var(--prog)}
+.uchip{background:var(--chip);border-radius:999px;padding:3px 10px;font-weight:600;color:var(--txt)}
+
+/* historial */
+.hist{display:flex;flex-direction:column;gap:0}
+.hitem{display:flex;gap:12px;align-items:baseline;padding:10px 12px;border-bottom:1px solid #21252e}
+.hitem:hover{background:#1c202a}
+.hwhen{font-size:11px;color:var(--muted);white-space:nowrap;width:120px;flex-shrink:0}
+.hwho{font-weight:650;white-space:nowrap;flex-shrink:0}
+.hflag{margin-right:5px}
+.hcountry{font-size:11px;color:var(--muted);margin-left:4px}
+.haction{flex:1;color:var(--txt)}
+.hempty{padding:30px;text-align:center;color:var(--muted)}
+.hfilter{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div class="overlay" id="overlay">
+  <div class="login">
+    <h2>Timeline FerBolagay</h2>
+    <p>Ingresá la clave y tu nombre para ver y editar el plan compartido.</p>
+    <label>Tu nombre</label>
+    <input id="lg-name" placeholder="ej: Bupi, Gonza, Fer…" autocomplete="off"/>
+    <label>Clave</label>
+    <input id="lg-pass" type="password" placeholder="clave de acceso" autocomplete="off"/>
+    <button class="primary" id="lg-btn">Entrar</button>
+    <div class="err" id="lg-err"></div>
+  </div>
+</div>
+<header>
+  <div class="hrow">
+    <h1>Timeline FerBolagay <span>· gestor de tareas y cuenta</span></h1>
+    <div class="spacer"></div>
+    <div class="who"><span class="syncdot" id="syncdot"></span><span id="syncmsg">…</span>
+      <span class="uchip" id="uchip"></span></div>
+    <input class="search" id="search" placeholder="Buscar…"/>
+    <label class="toggle"><input type="checkbox" id="cascade" checked/> Auto-empujar</label>
+    <button class="ghost" id="expcsv">CSV</button>
+    <button class="ghost" id="expjson">JSON</button>
+    <button class="ghost danger" id="reset">Reiniciar</button>
+  </div>
+  <div class="tabs">
+    <div class="tab active" data-tab="crono">Cronograma</div>
+    <div class="tab" data-tab="cuenta">Cuenta de Fer</div>
+    <div class="tab" data-tab="historial">Historial</div>
+  </div>
+</header>
+<div class="wrap">
+  <div id="crono"></div>
+  <div id="cuenta" class="hidden"></div>
+  <div id="historial" class="hidden"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const ORIGINAL = [{"id": 1, "etapa": "1- Marca Fer Bolagay y Cuentas Con Fer", "bloque": "B0", "semana": "1", "titulo": "Aprobación de propuesta", "start": "2025-09-29", "due": "2025-10-05", "duration": 7, "done": true, "valini": "", "valpost": "", "pago": "", "details": [{"label": "B&G", "text": "Preparar agenda y plan de la sesión", "done": true, "date": "2025-09-29"}, {"label": "Entrega", "text": "Calendario de Trabajo", "done": true, "date": "2025-09-29"}, {"label": "B&G", "text": "Preparar Reunion", "done": true, "date": "2025-10-01"}, {"label": "Fer", "text": "Preparar resumen de objetivos y panorama de la empresa", "done": true, "date": "2025-10-01"}], "order": 0}, {"id": 2, "etapa": "1- Marca Fer Bolagay y Cuentas Con Fer", "bloque": "B1", "semana": "2", "titulo": "Sesión de Planificación inicial", "start": "2025-10-06", "due": "2025-10-12", "duration": 7, "done": true, "valini": "$250", "valpost": "$0", "pago": "Pagado con Servicio Fer", "details": [{"label": "Reunión", "text": "Sesión 1.5h para definir metas y objetivos y ruta de la comunicación del negocio para crecer hacia objetivos", "done": false, "date": "2025-10-06"}, {"label": "Entrega", "text": "Minutas de reunion", "done": true, "date": "2025-10-06"}, {"label": "B&G", "text": "Preparar Informe diagnóstico y mapa de ruta", "done": true, "date": "2025-10-07"}, {"label": "Fer", "text": "Buscar referencias de diseño/competencia, informe de clientela con estadisticas", "done": true, "date": "2025-10-07"}, {"label": "Entrega", "text": "Informe y mapa de ruta", "done": true, "date": "2025-10-09"}, {"label": "B&G", "text": "Research local e internacional de referencias + Meet prep", "done": true, "date": "2025-10-10"}], "order": 1}, {"id": 3, "etapa": "1- Marca Fer Bolagay y Cuentas Con Fer", "bloque": "B2", "semana": "3", "titulo": "Sesion postpuesta por emergencia familiar", "start": "2025-10-13", "due": "2025-10-16", "duration": 4, "done": false, "valini": "$350", "valpost": "$300", "pago": "Pagado con Servicio Fer", "details": [], "order": 2}, {"id": 4, "etapa": "1- Marca Fer Bolagay y Cuentas Con Fer", "bloque": "B2", "semana": "3", "titulo": "Definición de Estilo", "start": "2025-10-17", "due": "2025-10-19", "duration": 3, "done": true, "valini": "", "valpost": "", "pago": "", "details": [{"label": "Reunión", "text": "Sesión 2h para encontrar la estética y personalidad de la marca", "done": true, "date": "2025-10-17"}, {"label": "Entrega", "text": "Minutas de reunion", "done": true, "date": "2025-10-17"}, {"label": "B&G", "text": "Refinar Vision Board  + Crear Informe de Branding Actual", "done": true, "date": "2025-10-18"}, {"label": "Entrega", "text": "Vision board  + Informe de Branding actual", "done": true, "date": "2025-10-18"}, {"label": "B&G", "text": "Research", "done": true, "date": "2025-10-19"}], "order": 3}, {"id": 5, "etapa": "1- Marca Fer Bolagay y Cuentas Con Fer", "bloque": "B3", "semana": "4", "titulo": "Elaboración de Marca", "start": "2025-10-20", "due": "2025-10-26", "duration": 7, "done": true, "valini": "$750", "valpost": "$550", "pago": "Pagado con Servicio Fer", "details": [{"label": "B&G", "text": "Trabajo interno en propuestas de branding - no hay sesión", "done": true, "date": "2025-10-20"}, {"label": "Fer", "text": "- No hay sesión", "done": false, "date": "2025-10-20"}, {"label": "Fer", "text": "Aprobar o dar feedback sobre Vision Board", "done": true, "date": "2025-10-21"}, {"label": "B&G", "text": "Preparar presentación", "done": true, "date": "2025-10-25"}], "order": 4}, {"id": 6, "etapa": "1- Marca Fer Bolagay y Cuentas Con Fer", "bloque": "B3", "semana": "5", "titulo": "Presentación Propuestas", "start": "2025-10-27", "due": "2025-11-02", "duration": 7, "done": true, "valini": "", "valpost": "", "pago": "", "details": [{"label": "Reunión", "text": "Sesión para discutir opciones y recibir feedback inicial", "done": true, "date": "2025-10-27"}, {"label": "Entrega", "text": "Primera Propuesta", "done": true, "date": "2025-10-27"}, {"label": "B&G", "text": "Trabajo en ajustes de primera propuesta de branding", "done": true, "date": "2025-10-28"}, {"label": "Fer", "text": "Devolver extra feedback/referencias cambios de primera propuesta", "done": true, "date": "2025-10-28"}], "order": 5}, {"id": 7, "etapa": "1- Marca Fer Bolagay y Cuentas Con Fer", "bloque": "B3", "semana": "6", "titulo": "Presentación con Ajustes de Marca", "start": "2025-11-03", "due": "2025-11-09", "duration": 7, "done": true, "valini": "", "valpost": "", "pago": "", "details": [{"label": "Reunión", "text": "Sesión para aprobar propuesta elegida y Revisar los elementos de marca necesarios", "done": true, "date": "2025-11-03"}, {"label": "Entrega", "text": "Segunda Propuesta", "done": true, "date": "2025-11-03"}, {"label": "Fer", "text": "Enviar feedback final", "done": true, "date": "2025-11-04"}, {"label": "B&G", "text": "Trabajar en ultimos ajustes de Marca para entrega final", "done": true, "date": "2025-11-06"}, {"label": "Entrega", "text": "Propuesta Final", "done": true, "date": "2025-11-07"}], "order": 6}, {"id": 8, "etapa": "1- Marca Fer Bolagay y Cuentas Con Fer", "bloque": "B4", "semana": "7", "titulo": "Manual de Estilo", "start": "2025-11-10", "due": "2025-11-16", "duration": 7, "done": true, "valini": "$450", "valpost": "$300", "pago": "Pagado con Servicio Fer + 200$ diferencia", "details": [{"label": "B&G", "text": "Diseñar manual de estilo de marca", "done": true, "date": "2025-11-10"}, {"label": "Fer", "text": "- No hay sesión", "done": false, "date": "2025-11-10"}, {"label": "Entrega", "text": "Manual de Marca + Fuentes + Marca + Piezas de diseño", "done": true, "date": "2025-11-14"}], "order": 7}, {"id": 9, "etapa": "1- Marca Fer Bolagay y Cuentas Con Fer", "bloque": "B5", "semana": "8", "titulo": "Submarca Cuentas Con Fer", "start": "2025-11-17", "due": "2025-11-23", "duration": 7, "done": false, "valini": "$450", "valpost": "$350", "pago": "", "details": [{"label": "Reunión", "text": "Sesión para Revisar ideas al rededor de submarca", "done": false, "date": "2025-11-17"}, {"label": "B&G", "text": "Preparar propuestas de submarca + Mini Manual", "done": false, "date": "2025-11-18"}, {"label": "Entrega", "text": "Entrega de Submarca Cuentas con Fer + Mini Manual + Piezas de diseño", "done": false, "date": "2025-11-21"}], "order": 8}, {"id": 10, "etapa": "1- Marca Fer Bolagay y Cuentas Con Fer", "bloque": "B5", "semana": "9", "titulo": "Entrega Final", "start": "2025-11-24", "due": "2025-11-30", "duration": 7, "done": false, "valini": "", "valpost": "", "pago": "", "details": [{"label": "Fer", "text": "- No hay sesión pero hay feedback via mail", "done": false, "date": "2025-11-24"}, {"label": "B&G", "text": "Compilar y preparar entrega final,  y Realizar pequeños ajustes si hubiere", "done": false, "date": "2025-11-25"}, {"label": "Fer", "text": "Enviar Feedback si hubiesen cambios", "done": false, "date": "2025-11-25"}, {"label": "Entrega", "text": "Entrega ajustada si hubiesen cambios", "done": false, "date": "2025-11-26"}], "order": 9}, {"id": 11, "etapa": "2- SITIO WEB Fer Bolagay", "bloque": "B1", "semana": "10", "titulo": "Sesion de Planificación Web", "start": "2025-12-01", "due": "2025-12-07", "duration": 7, "done": false, "valini": "$300", "valpost": "$150", "pago": "", "details": [{"label": "Reunión", "text": "Definir estructura del sitio, Necesidades y Estilo de Sitios Web + Creacion en conjunto de documento de contenido", "done": false, "date": "2025-12-01"}, {"label": "Entrega", "text": "Minutas de Reunion+Documento rellenable de sitio", "done": true, "date": "2025-12-01"}, {"label": "B&G", "text": "Analizar plataformas y crear estructura general de sitio", "done": false, "date": "2025-12-02"}, {"label": "Fer", "text": "Completar documento de contenido compartido", "done": false, "date": "2025-12-02"}, {"label": "Entrega", "text": "Entrega mapa de sitio", "done": true, "date": "2025-12-05"}, {"label": "B&G", "text": "Diseñar mockup del sitio", "done": false, "date": "2025-12-06"}], "order": 10}, {"id": 12, "etapa": "2- SITIO WEB Fer Bolagay", "bloque": "B2", "semana": "11", "titulo": "Contenido y Mockup", "start": "2025-12-08", "due": "2025-12-14", "duration": 7, "done": false, "valini": "$300", "valpost": "$175", "pago": "", "details": [{"label": "Reunión", "text": "- No hay sesión pero hay feedback via mail/comments en el documento", "done": false, "date": "2025-12-08"}, {"label": "Reunión", "text": "*puede que estemos offline - a confirmar", "done": false, "date": "2025-12-09"}, {"label": "Entrega", "text": "Mock up del sitio + Curación de contenido", "done": false, "date": "2025-12-11"}], "order": 11}, {"id": 13, "etapa": "2- SITIO WEB Fer Bolagay", "bloque": "B2", "semana": "12", "titulo": "Revisión Mockup y Contenido (B2) + inicio de desarrollo web (B3)", "start": "2025-12-15", "due": "2025-12-15", "duration": 1, "done": false, "valini": "", "valpost": "", "pago": "", "details": [{"label": "Reunión", "text": "Sesión para evaluar los bocetos de la estetica del sitio y para pulir el contenido antes de iniciar oficialmente con la estructuración del website.", "done": false, "date": "2025-12-15"}], "order": 12}, {"id": 14, "etapa": "2- SITIO WEB Fer Bolagay", "bloque": "B3", "semana": "12", "titulo": "Desarrollo Web", "start": "2025-12-16", "due": "2025-12-23", "duration": 8, "done": false, "valini": "$1,200", "valpost": "$750", "pago": "", "details": [{"label": "B&G", "text": "B&G trabajan en desarrollo web y codeo del sitio", "done": false, "date": "2025-12-16"}, {"label": "Fer", "text": "Proveer contenido faltante, fotos, Proveer feedback", "done": false, "date": "2025-12-16"}, {"label": "Fer", "text": "Felices Fiestas", "done": false, "date": "2025-12-20"}, {"label": "Reunión", "text": "- No hay sesión pero hay feedback via mail/comments en el documento", "done": false, "date": "2025-12-22"}], "order": 13}, {"id": 15, "etapa": "2- SITIO WEB Fer Bolagay", "bloque": "XMAS BREAK", "semana": "13", "titulo": "XMAS BREAK", "start": "2025-12-24", "due": "2026-01-04", "duration": 12, "done": false, "valini": "", "valpost": "", "pago": "", "details": [{"label": "B&G", "text": "B&G trabajan en desarrollo web y codeo del sitio", "done": false, "date": "2026-01-02"}, {"label": "Entrega", "text": "Demo del sitio", "done": false, "date": "2026-01-02"}, {"label": "B&G", "text": "Preparar demo del sitio", "done": false, "date": "2026-01-04"}], "order": 14}, {"id": 16, "etapa": "2- SITIO WEB Fer Bolagay", "bloque": "B3", "semana": "15", "titulo": "Revisión de Sitio en general", "start": "2026-01-05", "due": "2026-01-11", "duration": 7, "done": false, "valini": "", "valpost": "", "pago": "", "details": [{"label": "Reunión", "text": "Sesión para revisar el sitio web, testear uso,\ny proporcionar feedback inicial.", "done": false, "date": "2026-01-05"}, {"label": "B&G", "text": "Aplicar cambios iniciales y seguir trabajando en detalle en el sitio", "done": false, "date": "2026-01-06"}, {"label": "Fer", "text": "Enviar extra feedback si hubiese", "done": false, "date": "2026-01-06"}], "order": 15}, {"id": 17, "etapa": "2- SITIO WEB Fer Bolagay", "bloque": "B3", "semana": "16", "titulo": "Revisión de Sitio en detalle previo a publicacion", "start": "2026-01-12", "due": "2026-01-18", "duration": 7, "done": false, "valini": "", "valpost": "", "pago": "", "details": [{"label": "Reunión", "text": "Sesión para revisar en detalle el sitio web, testear uso, y proporcionar feedback detallado.", "done": false, "date": "2026-01-12"}, {"label": "Entrega", "text": "Demo del sitio", "done": false, "date": "2026-01-12"}, {"label": "B&G", "text": "Aplicar cambios y seguir trabajando en detalle en el sitio", "done": false, "date": "2026-01-13"}, {"label": "Fer", "text": "Hacer prueba completa y enviar feedback", "done": false, "date": "2026-01-13"}], "order": 16}, {"id": 18, "etapa": "2- SITIO WEB Fer Bolagay", "bloque": "B4", "semana": "17", "titulo": "Testing Final y publicación del sitio", "start": "2026-01-19", "due": "2026-01-25", "duration": 7, "done": false, "valini": "$250.00", "valpost": "$175.00", "pago": "", "details": [{"label": "Reunión", "text": "Sesión para testear en detalle el sitio web, correjir ultimos detalles y publicar.", "done": false, "date": "2026-01-19"}, {"label": "Entrega", "text": "Sitio Web listo", "done": false, "date": "2026-01-19"}, {"label": "B&G", "text": "Publicar web", "done": false, "date": "2026-01-20"}, {"label": "B&G", "text": "Trabajar en versión mobile", "done": false, "date": "2026-01-21"}, {"label": "Fer", "text": "Hacer prueba mobile y enviar feedback", "done": false, "date": "2026-01-22"}], "order": 17}, {"id": 19, "etapa": "2- SITIO WEB Fer Bolagay", "bloque": "B4", "semana": "18", "titulo": "Versión Mobile", "start": "2026-01-26", "due": "2026-02-01", "duration": 7, "done": false, "valini": "", "valpost": "", "pago": "", "details": [{"label": "Reunión", "text": "Sesión corta para testear en detalle el sitio web mobile, correjir ultimos detalles y publicar.", "done": false, "date": "2026-01-26"}, {"label": "B&G", "text": "Aplicar cambios si hubiere y publicar versión mobile", "done": false, "date": "2026-01-27"}, {"label": "Fer", "text": "Hacer prueba y enviar final feedback", "done": false, "date": "2026-01-27"}, {"label": "Entrega", "text": "Sitio Web y mobilepublicado", "done": false, "date": "2026-01-28"}, {"label": "Fer", "text": "Preparar lista de assets digitales para siguiente etapa", "done": false, "date": "2026-01-31"}], "order": 18}, {"id": 20, "etapa": "3-Assets Digitales - Fer Bolagay", "bloque": "B1", "semana": "19", "titulo": "Workshop para definir assets digitales", "start": "2026-02-02", "due": "2026-02-08", "duration": 7, "done": false, "valini": "$250.00", "valpost": "$0.00", "pago": "", "details": [{"label": "Reunión", "text": "Se define una lista clara de assets a realizar y se crea documento para rellenar contenido + presupuesta con tabla dinámica", "done": false, "date": "2026-02-02"}, {"label": "Entrega", "text": "Minutas de la reunion + documento para rellenar contenido", "done": false, "date": "2026-02-02"}, {"label": "B&G", "text": "Crear Tabla dinamica con presupuesto y timeline", "done": false, "date": "2026-02-03"}, {"label": "Fer", "text": "Completar info de assets", "done": false, "date": "2026-02-03"}, {"label": "Entrega", "text": "Tabla dinamica de contenido y timeline", "done": false, "date": "2026-02-04"}, {"label": "Fer", "text": "Aprobar presupuesto y timeline", "done": false, "date": "2026-02-05"}, {"label": "B&G", "text": "Diseñar el contenido propuesto para RRSS", "done": false, "date": "2026-02-07"}, {"label": "Fer", "text": "Completar info de redes y assets digitales", "done": false, "date": "2026-02-07"}], "order": 19}, {"id": 21, "etapa": "3-Assets Digitales - Fer Bolagay", "bloque": "B2", "semana": "20", "titulo": "Contenido RRSS", "start": "2026-02-09", "due": "2026-02-15", "duration": 7, "done": false, "valini": "$450.00", "valpost": "$300.00", "pago": "", "details": [{"label": "Reunión", "text": "- No hay sesión hay feedback via whatsapp/mail/documents", "done": false, "date": "2026-02-09"}, {"label": "Entrega", "text": "Templates + Piezas de redes", "done": false, "date": "2026-02-12"}], "order": 20}, {"id": 22, "etapa": "3-Assets Digitales - Fer Bolagay", "bloque": "B2", "semana": "21", "titulo": "Entrega Templates", "start": "2026-02-16", "due": "2026-02-22", "duration": 7, "done": false, "valini": "", "valpost": "", "pago": "", "details": [{"label": "Fer", "text": "Feedback templates", "done": false, "date": "2026-02-16"}, {"label": "Reunión", "text": "- No hay sesión hay feedback via whatsapp/mail/documents", "done": false, "date": "2026-02-16"}, {"label": "B&G", "text": "Cambios a templates si hubiesen o avance con productos digitales", "done": false, "date": "2026-02-18"}, {"label": "Fer", "text": "Completar contenido para los siguientes assets digitales", "done": false, "date": "2026-02-18"}, {"label": "Entrega", "text": "Assets para RRSS luego de ajustes si hubiesen", "done": false, "date": "2026-02-18"}], "order": 21}, {"id": 23, "etapa": "3-Assets Digitales - Fer Bolagay", "bloque": "B4", "semana": "22", "titulo": "Productos Digitales", "start": "2026-02-23", "due": "2026-03-01", "duration": 7, "done": false, "valini": "A convenir", "valpost": "A convenir", "pago": "", "details": [{"label": "B&G", "text": "Diseño productos digitales", "done": false, "date": "2026-02-23"}, {"label": "Reunión", "text": "- No hay sesión hay feedback via whatsapp/mail/documents", "done": false, "date": "2026-02-23"}, {"label": "Reunión", "text": "Diseñar productos", "done": false, "date": "2026-02-24"}, {"label": "Entrega", "text": "Productos digitales", "done": false, "date": "2026-02-25"}], "order": 22}, {"id": 24, "etapa": "3-Assets Digitales - Fer Bolagay", "bloque": "B3", "semana": "23", "titulo": "Documentos internos", "start": "2026-03-02", "due": "2026-03-08", "duration": 7, "done": false, "valini": "A convenir", "valpost": "A convenir", "pago": "", "details": [{"label": "B&G", "text": "Diseño documentos internos", "done": false, "date": "2026-03-02"}, {"label": "Fer", "text": "Feedback productos digitales", "done": false, "date": "2026-03-02"}, {"label": "Reunión", "text": "- No hay sesión hay feedback via whatsapp/mail/documents", "done": false, "date": "2026-03-02"}, {"label": "Entrega", "text": "Documentos internos", "done": false, "date": "2026-03-04"}, {"label": "Fer", "text": "Feedback documentos", "done": false, "date": "2026-03-05"}], "order": 23}, {"id": 25, "etapa": "3-Assets Digitales - Fer Bolagay", "bloque": "B3", "semana": "24", "titulo": "Entrega Final", "start": "2026-03-09", "due": "2026-03-15", "duration": 7, "done": false, "valini": "A convenir", "valpost": "A convenir", "pago": "", "details": [{"label": "Reunión", "text": "Sesion final para revisar todos los archivos y el trabajo realizado, dar feedback final y completar la ultima etapa", "done": false, "date": "2026-03-09"}, {"label": "B&G", "text": "Diseño y ajuste final a archivos q lo requieran", "done": false, "date": "2026-03-10"}, {"label": "Entrega", "text": "Entrega final de assets corregidos y listos", "done": false, "date": "2026-03-11"}], "order": 24}, {"id": 26, "etapa": "1- Marca TusCFO", "bloque": "B1", "semana": "25", "titulo": "Sesión de Planificación", "start": "2026-03-16", "due": "2026-03-22", "duration": 7, "done": false, "valini": "$250", "valpost": "$0", "pago": "", "details": [{"label": "Reunión", "text": "Sesión 1.5h para definir metas y objetivos y ruta de la comunicación del negocio para crecer hacia objetivos", "done": false, "date": "2026-03-16"}, {"label": "Entrega", "text": "Minutas de reunion", "done": false, "date": "2026-03-16"}, {"label": "B&G", "text": "Preparar Informe diagnóstico y mapa de ruta", "done": false, "date": "2026-03-17"}, {"label": "Fer", "text": "Buscar referencias de diseño/competencia", "done": false, "date": "2026-03-17"}, {"label": "Entrega", "text": "Informe y mapa de ruta", "done": false, "date": "2026-03-19"}, {"label": "B&G", "text": "Research local e internacional de referencias + Preparar reunion", "done": false, "date": "2026-03-20"}], "order": 25}, {"id": 27, "etapa": "1- Marca TusCFO", "bloque": "B2", "semana": "26", "titulo": "Definición de Estilo", "start": "2026-03-23", "due": "2026-03-29", "duration": 7, "done": false, "valini": "$350", "valpost": "$300", "pago": "", "details": [{"label": "Reunión", "text": "Sesión 2h para encontrar la estética y personalidad de la marca", "done": false, "date": "2026-03-23"}, {"label": "Entrega", "text": "Minutas de reunion", "done": false, "date": "2026-03-23"}, {"label": "B&G", "text": "Refinar Vision Board + Crear Informe de Branding Actual", "done": false, "date": "2026-03-24"}, {"label": "Entrega", "text": "Vision board + Informe de Branding actual", "done": false, "date": "2026-03-26"}, {"label": "Fer", "text": "Aprobar o dar feedback sobre Vision Board", "done": false, "date": "2026-03-27"}, {"label": "B&G", "text": "Research", "done": false, "date": "2026-03-28"}], "order": 26}, {"id": 28, "etapa": "1- Marca TusCFO", "bloque": "B3", "semana": "27", "titulo": "Elaboración de Marca", "start": "2026-03-30", "due": "2026-04-05", "duration": 7, "done": false, "valini": "$750", "valpost": "$550", "pago": "", "details": [{"label": "B&G", "text": "Trabajo interno en propuestas de branding - no hay sesión", "done": false, "date": "2026-03-30"}, {"label": "Fer", "text": "- No hay sesión", "done": false, "date": "2026-03-30"}, {"label": "B&G", "text": "Preparar presentación", "done": false, "date": "2026-04-04"}], "order": 27}, {"id": 29, "etapa": "1- Marca TusCFO", "bloque": "B3", "semana": "28", "titulo": "Presentación Propuestas", "start": "2026-04-06", "due": "2026-04-12", "duration": 7, "done": false, "valini": "", "valpost": "", "pago": "", "details": [{"label": "Reunión", "text": "Sesión para discutir opciones y recibir feedback inicial", "done": false, "date": "2026-04-06"}, {"label": "Entrega", "text": "Primera Propuesta", "done": false, "date": "2026-04-06"}, {"label": "B&G", "text": "Trabajo en ajustes de primera propuesta de branding", "done": false, "date": "2026-04-07"}, {"label": "Fer", "text": "Devolver extra feedback/referencias cambios de primera propuesta", "done": false, "date": "2026-04-07"}], "order": 28}, {"id": 30, "etapa": "1- Marca TusCFO", "bloque": "B3", "semana": "29", "titulo": "Presentación con Ajustes de Marca", "start": "2026-04-13", "due": "2026-04-19", "duration": 7, "done": false, "valini": "", "valpost": "", "pago": "", "details": [{"label": "Reunión", "text": "Sesión para aprobar propuesta elegida y Revisar los elementos de marca necesarios", "done": false, "date": "2026-04-13"}, {"label": "Entrega", "text": "Segunda Propuesta", "done": false, "date": "2026-04-13"}, {"label": "Fer", "text": "Enviar feedback final", "done": false, "date": "2026-04-14"}, {"label": "B&G", "text": "Trabajar en ultimos ajustes de Marca para entrega final", "done": false, "date": "2026-04-16"}, {"label": "Entrega", "text": "Propuesta Final", "done": false, "date": "2026-04-17"}], "order": 29}, {"id": 31, "etapa": "1- Marca TusCFO", "bloque": "B4", "semana": "30", "titulo": "Manual de Estilo", "start": "2026-04-20", "due": "2026-04-26", "duration": 7, "done": false, "valini": "$450", "valpost": "$300", "pago": "", "details": [{"label": "B&G", "text": "Diseñar manual/Fuentes/elementos de marca", "done": false, "date": "2026-04-20"}, {"label": "Fer", "text": "- No hay sesión", "done": false, "date": "2026-04-20"}, {"label": "Entrega", "text": "Manual de Marca + Fuentes + Marca + Piezas de diseño", "done": false, "date": "2026-04-23"}], "order": 30}, {"id": 32, "etapa": "2- SITIO WEB TusCFO", "bloque": "B1", "semana": "10", "titulo": "Sesion de Planificación Web", "start": "2026-04-27", "due": "2026-05-03", "duration": 7, "done": false, "valini": "$300", "valpost": "$150", "pago": "", "details": [{"label": "Reunión", "text": "Definir estructura del sitio, Necesidades y Estilo de Sitios Web + Creacion en conjunto de documento de contenido", "done": false, "date": "2026-04-27"}, {"label": "Entrega", "text": "Minutas de Reunion+Documento rellenable de sitio", "done": false, "date": "2026-04-27"}, {"label": "B&G", "text": "Analizar plataformas y crear estructura general de sitio", "done": false, "date": "2026-04-28"}, {"label": "Fer", "text": "Completar documento de contenido compartido", "done": false, "date": "2026-04-28"}, {"label": "Entrega", "text": "Entrega mapa de sitio", "done": false, "date": "2026-05-01"}, {"label": "B&G", "text": "Diseñar mockup del sitio", "done": false, "date": "2026-05-02"}], "order": 31}, {"id": 33, "etapa": "2- SITIO WEB TusCFO", "bloque": "B2", "semana": "11", "titulo": "Contenido y Mockup", "start": "2026-05-04", "due": "2026-05-10", "duration": 7, "done": false, "valini": "$300", "valpost": "$175", "pago": "", "details": [{"label": "Reunión", "text": "- No hay sesión pero hay feedback via mail/comments en el documento", "done": false, "date": "2026-05-04"}, {"label": "Reunión", "text": "*puede que estemos offline - a confirmar", "done": false, "date": "2026-05-05"}, {"label": "Entrega", "text": "Mock up del sitio + Curación de contenido", "done": false, "date": "2026-05-07"}], "order": 32}, {"id": 34, "etapa": "2- SITIO WEB TusCFO", "bloque": "B2", "semana": "12", "titulo": "Revisión Mockup y Contenido (B2) - Inicio de Desarrollo Web (B3)", "start": "2026-05-11", "due": "2026-05-11", "duration": 1, "done": false, "valini": "", "valpost": "", "pago": "", "details": [{"label": "Reunión", "text": "Sesión para evaluar los bocetos de la estetica del sitio y para pulir el contenido antes de iniciar oficialmente con la estructuración del website.", "done": false, "date": "2026-05-11"}], "order": 33}, {"id": 35, "etapa": "2- SITIO WEB TusCFO", "bloque": "B3", "semana": "12", "titulo": "Desarrollo Web", "start": "2026-05-12", "due": "2026-05-24", "duration": 13, "done": false, "valini": "$1,200", "valpost": "$750", "pago": "", "details": [{"label": "B&G", "text": "B&G trabajan en desarrollo web y codeo del sitio", "done": false, "date": "2026-05-12"}, {"label": "Fer", "text": "Proveer contenido faltante, fotos, Proveer feedback", "done": false, "date": "2026-05-12"}, {"label": "Reunión", "text": "- No hay sesión pero hay feedback via mail/comments en el documento", "done": false, "date": "2026-05-18"}, {"label": "B&G", "text": "B&G trabajan en desarrollo web y codeo del sitio", "done": false, "date": "2026-05-20"}, {"label": "Entrega", "text": "Demo del sitio", "done": false, "date": "2026-05-20"}, {"label": "B&G", "text": "Preparar demo del sitio", "done": false, "date": "2026-05-24"}], "order": 34}, {"id": 36, "etapa": "2- SITIO WEB TusCFO", "bloque": "B3", "semana": "15", "titulo": "Revisión de Sitio en general", "start": "2026-05-25", "due": "2026-05-31", "duration": 7, "done": false, "valini": "", "valpost": "", "pago": "", "details": [{"label": "Reunión", "text": "Sesión para revisar el sitio web, testear uso,\ny proporcionar feedback inicial.", "done": false, "date": "2026-05-25"}, {"label": "B&G", "text": "Aplicar cambios iniciales y seguir trabajando en detalle en el sitio", "done": false, "date": "2026-05-26"}, {"label": "Fer", "text": "Enviar extra feedback si hubiese", "done": false, "date": "2026-05-26"}], "order": 35}, {"id": 37, "etapa": "2- SITIO WEB TusCFO", "bloque": "B3", "semana": "16", "titulo": "Revisión de Sitio en detalle previo a publicacion", "start": "2026-06-01", "due": "2026-06-07", "duration": 7, "done": false, "valini": "", "valpost": "", "pago": "", "details": [{"label": "Reunión", "text": "Sesión para revisar en detalle el sitio web, testear uso, y proporcionar feedback detallado.", "done": false, "date": "2026-06-01"}, {"label": "Entrega", "text": "Demo del sitio", "done": false, "date": "2026-06-01"}, {"label": "B&G", "text": "Aplicar cambios y seguir trabajando en detalle en el sitio", "done": false, "date": "2026-06-02"}, {"label": "Fer", "text": "Hacer prueba completa y enviar feedback", "done": false, "date": "2026-06-02"}], "order": 36}, {"id": 38, "etapa": "2- SITIO WEB TusCFO", "bloque": "B4", "semana": "17", "titulo": "Testing Final y publicación del sitio", "start": "2026-06-08", "due": "2026-06-14", "duration": 7, "done": false, "valini": "$250.00", "valpost": "$175.00", "pago": "", "details": [{"label": "Reunión", "text": "Sesión para testear en detalle el sitio web, correjir ultimos detalles y publicar.", "done": false, "date": "2026-06-08"}, {"label": "Entrega", "text": "Sitio Web listo", "done": false, "date": "2026-06-08"}, {"label": "B&G", "text": "Publicar web", "done": false, "date": "2026-06-09"}, {"label": "B&G", "text": "Trabajar en versión mobile", "done": false, "date": "2026-06-10"}, {"label": "Fer", "text": "Hacer prueba mobile y enviar feedback", "done": false, "date": "2026-06-11"}], "order": 37}, {"id": 39, "etapa": "2- SITIO WEB TusCFO", "bloque": "B4", "semana": "18", "titulo": "Versión Mobile", "start": "2026-06-15", "due": "2026-06-21", "duration": 7, "done": false, "valini": "", "valpost": "", "pago": "", "details": [{"label": "Reunión", "text": "Sesión corta para testear en detalle el sitio web mobile, correjir ultimos detalles y publicar.", "done": false, "date": "2026-06-15"}, {"label": "B&G", "text": "Aplicar cambios si hubiere y publicar versión mobile", "done": false, "date": "2026-06-16"}, {"label": "Fer", "text": "Hacer prueba y enviar final feedback", "done": false, "date": "2026-06-16"}, {"label": "Entrega", "text": "Sitio Web y mobilepublicado", "done": false, "date": "2026-06-17"}, {"label": "Fer", "text": "Preparar lista de assets digitales para siguiente etapa", "done": false, "date": "2026-06-20"}], "order": 38}, {"id": 40, "etapa": "3-Assets Digitales - TusCFO", "bloque": "B1", "semana": "19", "titulo": "Workshop para definir assets digitales", "start": "2026-06-22", "due": "2026-06-28", "duration": 7, "done": false, "valini": "$250.00", "valpost": "$0.00", "pago": "", "details": [{"label": "Reunión", "text": "Se define una lista clara de assets a realizar y se crea documento para rellenar contenido + presupuesta con tabla dinámica", "done": false, "date": "2026-06-22"}, {"label": "Entrega", "text": "Minutas de la reunion + documento para rellenar contenido", "done": false, "date": "2026-06-22"}, {"label": "B&G", "text": "Crear Tabla dinamica con presupuesto y timeline", "done": false, "date": "2026-06-23"}, {"label": "Fer", "text": "Completar info de assets", "done": false, "date": "2026-06-23"}, {"label": "Entrega", "text": "Tabla dinamica de contenido y timeline", "done": false, "date": "2026-06-24"}, {"label": "Fer", "text": "Aprobar presupuesto y timeline", "done": false, "date": "2026-06-25"}, {"label": "B&G", "text": "Diseñar el contenido propuesto para RRSS", "done": false, "date": "2026-06-27"}, {"label": "Fer", "text": "Completar info de redes y assets digitales", "done": false, "date": "2026-06-27"}], "order": 39}, {"id": 41, "etapa": "3-Assets Digitales - TusCFO", "bloque": "B2", "semana": "20", "titulo": "Contenido RRSS", "start": "2026-06-29", "due": "2026-07-05", "duration": 7, "done": false, "valini": "$450.00", "valpost": "$300.00", "pago": "", "details": [{"label": "Reunión", "text": "- No hay sesión hay feedback via whatsapp/mail/documents", "done": false, "date": "2026-06-29"}, {"label": "Entrega", "text": "Templates + Piezas de redes", "done": false, "date": "2026-07-02"}], "order": 40}, {"id": 42, "etapa": "3-Assets Digitales - TusCFO", "bloque": "B2", "semana": "21", "titulo": "Entrega Templates", "start": "2026-07-06", "due": "2026-07-12", "duration": 7, "done": false, "valini": "", "valpost": "", "pago": "", "details": [{"label": "Fer", "text": "Feedback templates", "done": false, "date": "2026-07-06"}, {"label": "Reunión", "text": "- No hay sesión hay feedback via whatsapp/mail/documents", "done": false, "date": "2026-07-06"}, {"label": "B&G", "text": "Cambios a templates si hubiesen o avance con productos digitales", "done": false, "date": "2026-07-08"}, {"label": "Fer", "text": "Completar contenido para los siguientes assets digitales", "done": false, "date": "2026-07-08"}, {"label": "Entrega", "text": "Assets para RRSS luego de ajustes si hubiesen", "done": false, "date": "2026-07-08"}], "order": 41}, {"id": 43, "etapa": "3-Assets Digitales - TusCFO", "bloque": "B4", "semana": "22", "titulo": "Productos Digitales", "start": "2026-07-13", "due": "2026-07-19", "duration": 7, "done": false, "valini": "A convenir", "valpost": "A convenir", "pago": "", "details": [{"label": "B&G", "text": "Diseño productos digitales", "done": false, "date": "2026-07-13"}, {"label": "Reunión", "text": "- No hay sesión hay feedback via whatsapp/mail/documents", "done": false, "date": "2026-07-13"}, {"label": "Reunión", "text": "Diseñar productos", "done": false, "date": "2026-07-14"}, {"label": "Entrega", "text": "Productos digitales", "done": false, "date": "2026-07-15"}], "order": 42}, {"id": 44, "etapa": "3-Assets Digitales - TusCFO", "bloque": "B3", "semana": "23", "titulo": "Documentos internos", "start": "2026-07-20", "due": "2026-07-26", "duration": 7, "done": false, "valini": "A convenir", "valpost": "A convenir", "pago": "", "details": [{"label": "B&G", "text": "Diseño documentos internos", "done": false, "date": "2026-07-20"}, {"label": "Fer", "text": "Feedback productos digitales", "done": false, "date": "2026-07-20"}, {"label": "Reunión", "text": "- No hay sesión hay feedback via whatsapp/mail/documents", "done": false, "date": "2026-07-20"}, {"label": "Entrega", "text": "Documentos internos", "done": false, "date": "2026-07-22"}, {"label": "Fer", "text": "Feedback documentos", "done": false, "date": "2026-07-23"}], "order": 43}, {"id": 45, "etapa": "3-Assets Digitales - TusCFO", "bloque": "B3", "semana": "24", "titulo": "Entrega Final", "start": "2026-07-27", "due": "2026-08-02", "duration": 7, "done": false, "valini": "A convenir", "valpost": "A convenir", "pago": "", "details": [{"label": "Reunión", "text": "Sesion final para revisar todos los archivos y el trabajo realizado, dar feedback final y completar la ultima etapa", "done": false, "date": "2026-07-27"}, {"label": "B&G", "text": "Diseño y ajuste final a archivos q lo requieran", "done": false, "date": "2026-07-28"}, {"label": "Entrega", "text": "Entrega final de assets corregidos y listos", "done": false, "date": "2026-07-29"}], "order": 44}];
+const LSKEY = "ferbolagay_v3";
+const SESKEY = "ferbyg_session";
+let session = {name:'', pass:'', country:''};
+let sync = {configured:false, on:false, mode:'local', version:0, pushTimer:null, poll:null, busy:false, dirty:false};
+let pendingEntries = [];
+let STATE = {tasks:[], payments:[], history:[]};
+let tasks = [];
+let openItems = {};
+let collapsed = {};
+let tab = "crono";
+let dragId = null;
+
+function initTasks(src){
+  return src.map(t=>{
+    const c=JSON.parse(JSON.stringify(t));
+    const paid=/pagad/i.test(t.pago||"");
+    c.status = t.done ? "entregado" : (t.details.some(d=>d.done)?"prog":"todo");
+    c.settled = paid;               // ya saldado (trueque/servicio) -> no suma a deuda en efectivo
+    c.price = t.valpost || t.valini || "";
+    return c;
+  });
+}
+function setState(s){
+  STATE = {
+    tasks: (s.tasks && s.tasks.length) ? s.tasks : initTasks(ORIGINAL),
+    payments: s.payments || [],
+    history: s.history || []
+  };
+  tasks = STATE.tasks;
+  sync.version = s.version || 0;
+}
+function cacheLocal(){try{localStorage.setItem(LSKEY,JSON.stringify({...STATE,version:sync.version}));}catch(e){}}
+function loadLocal(){try{const s=localStorage.getItem(LSKEY);if(s)return JSON.parse(s);}catch(e){}return null;}
+function save(){cacheLocal();scheduleSync();}
+function logChange(action){pendingEntries.push({action});}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1600);}
+
+/* dates */
+function pd(s){if(!s)return null;const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);}
+function fmt(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function addDays(s,n){const d=pd(s);if(!d)return s;d.setDate(d.getDate()+n);return fmt(d);}
+function diffDays(a,b){return Math.round((pd(a)-pd(b))/86400000);}
+function pretty(s){const d=pd(s);if(!d)return '—';return d.toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'2-digit'});}
+
+/* money */
+function money(s){if(s==null)return null;const m=String(s).replace(/[^0-9.,-]/g,'').replace(/,/g,'');const v=parseFloat(m);return isNaN(v)?null:v;}
+function fm(v){return '$'+v.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2});}
+const STLABEL={todo:'Por hacer',prog:'En progreso',entregado:'Entregado'};
+
+/* cascade */
+function shiftFollowing(order,n){if(!n)return;tasks.forEach(t=>{if(t.order>order){t.start=addDays(t.start,n);t.due=addDays(t.due,n);}});}
+function setStart(t,v){const d=diffDays(v,t.start);t.start=v;t.due=addDays(v,t.duration-1);if(cascadeOn())shiftFollowing(t.order,d);logChange('Cambió inicio de "'+t.titulo+'" → '+v+(cascadeOn()&&d?' (empujó '+d+'d las siguientes)':''));commit();}
+function setDue(t,v){const old=t.due;t.due=v;t.duration=Math.max(1,diffDays(v,t.start)+1);const d=diffDays(v,old);if(cascadeOn())shiftFollowing(t.order,d);logChange('Cambió entrega de "'+t.titulo+'" → '+v+(cascadeOn()&&d?' (empujó '+d+'d las siguientes)':''));commit();}
+function setDur(t,v){v=Math.max(1,parseInt(v)||1);const old=t.due;t.duration=v;t.due=addDays(t.start,v-1);const d=diffDays(t.due,old);if(cascadeOn())shiftFollowing(t.order,d);logChange('Cambió duración de "'+t.titulo+'" a '+v+' días');commit();}
+function delayBy(t,n){n=parseInt(n)||0;if(!n)return;t.start=addDays(t.start,n);t.due=addDays(t.due,n);if(cascadeOn())shiftFollowing(t.order,n);logChange('Retrasó "'+t.titulo+'" '+(n>0?'+':'')+n+' días'+(cascadeOn()?' con las siguientes':''));commit();toast((n>0?'+':'')+n+' días');}
+function cascadeOn(){return document.getElementById('cascade').checked;}
+function commit(){save();render();}
+
+/* structural: reorder / add / delete  -> reflow contiguous dates */
+function renumber(){[...tasks].sort((a,b)=>a.order-b.order).forEach((t,i)=>t.order=i);}
+function reflow(){
+  const ord=[...tasks].sort((a,b)=>a.order-b.order);
+  if(!ord.length)return;
+  // anchor timeline at the earliest existing start so it never drifts
+  const anchor=tasks.reduce((m,t)=>(t.start&&(!m||t.start<m))?t.start:m,null);
+  ord[0].start=anchor||ord[0].start||fmt(new Date());
+  ord[0].due=addDays(ord[0].start,ord[0].duration-1);
+  for(let i=1;i<ord.length;i++){
+    ord[i].start=addDays(ord[i-1].due,1);
+    ord[i].due=addDays(ord[i].start,ord[i].duration-1);
+  }
+}
+function structuralCommit(){renumber();reflow();save();render();}
+
+function dropOn(dId,targetId,before){
+  if(dId==null||dId===targetId)return;
+  const dragged=tasks.find(x=>x.id===dId), target=tasks.find(x=>x.id===targetId);
+  if(!dragged||!target)return;
+  dragged.etapa=target.etapa;                       // adopt the project it lands in
+  dragged.order=target.order+(before?-0.5:0.5);
+  logChange('Reordenó "'+dragged.titulo+'" (recalculó fechas)');
+  structuralCommit();toast('Reordenado · fechas recalculadas');
+}
+function moveItem(t,dir){
+  const ord=[...tasks].sort((a,b)=>a.order-b.order);
+  const i=ord.findIndex(x=>x.id===t.id), j=i+dir;
+  if(j<0||j>=ord.length)return;
+  const other=ord[j];
+  const o=t.order;t.order=other.order;other.order=o;
+  t.etapa=other.etapa;
+  logChange((dir<0?'Subió':'Bajó')+' "'+t.titulo+'" (recalculó fechas)');
+  structuralCommit();
+}
+function addItem(etapa){
+  const maxId=tasks.reduce((m,t)=>Math.max(m,t.id),0);
+  const grp=tasks.filter(t=>t.etapa===etapa).sort((a,b)=>a.order-b.order);
+  const afterOrder=grp.length?grp[grp.length-1].order:(tasks.length?Math.max(...tasks.map(t=>t.order)):-1);
+  const nt={id:maxId+1,etapa,bloque:'',semana:'',titulo:'Nueva tarea',
+    start:'',due:'',duration:7,done:false,status:'todo',settled:false,
+    price:'',valini:'',valpost:'',pago:'',details:[],order:afterOrder+0.5};
+  tasks.push(nt);openItems[nt.id]=true;
+  logChange('Añadió ítem nuevo a '+shortProj(etapa));
+  structuralCommit();toast('Ítem añadido');
+}
+function deleteItem(t){
+  if(!confirm('¿Eliminar "'+t.titulo+'"? Esta acción recalcula las fechas siguientes.'))return;
+  const i=tasks.findIndex(x=>x.id===t.id);
+  if(i>=0)tasks.splice(i,1);
+  logChange('Eliminó "'+t.titulo+'"');
+  structuralCommit();toast('Ítem eliminado');
+}
+
+/* status of item */
+function stItem(t){return t.status||'todo';}
+
+/* ---------- render ---------- */
+function render(){
+  document.getElementById('crono').classList.toggle('hidden',tab!=='crono');
+  document.getElementById('cuenta').classList.toggle('hidden',tab!=='cuenta');
+  document.getElementById('historial').classList.toggle('hidden',tab!=='historial');
+  if(tab==='crono')renderCrono();
+  else if(tab==='cuenta')renderCuenta();
+  else renderHistorial();
+}
+
+function renderCrono(){
+  document.getElementById('crono').classList.remove('hidden');
+  document.getElementById('cuenta').classList.add('hidden');
+  const q=document.getElementById('search').value.toLowerCase().trim();
+  const root=document.getElementById('crono');root.innerHTML='';
+  const list=[...tasks].sort((a,b)=>a.order-b.order).filter(t=>{
+    if(!q)return true;return (t.titulo+' '+t.details.map(d=>d.text).join(' ')).toLowerCase().includes(q);
+  });
+  if(!list.length){root.innerHTML='<div class="muted" style="padding:30px;text-align:center">Sin resultados.</div>';return;}
+  const groups=[],seen={};
+  list.forEach(t=>{if(!seen[t.etapa]){seen[t.etapa]=[];groups.push(t.etapa);}seen[t.etapa].push(t);});
+  groups.forEach(g=>{
+    const gt=seen[g], dn=gt.filter(t=>stItem(t)==='entregado').length;
+    const pj=document.createElement('div');pj.className='proj'+(collapsed[g]?' collapsed':'');
+    pj.innerHTML=`<div class="proj-h" data-g="${esc(g)}">
+      <span class="caret">▾</span><h2>${esc(g)}</h2>
+      <span class="pm">${dn}/${gt.length} entregados</span></div>
+      <div class="items"></div>
+      <button class="additem" data-addto="${esc(g)}">+ Añadir ítem a ${esc(g)}</button>`;
+    const box=pj.querySelector('.items');
+    gt.forEach(t=>box.appendChild(itemEl(t)));
+    pj.querySelector('[data-addto]').addEventListener('click',()=>addItem(g));
+    root.appendChild(pj);
+  });
+}
+
+function blockColor(b){
+  if(!b)return null;
+  const m=/(\d+)/.exec(b);
+  if(!m)return {bg:'#343a42',fg:'#aab2c0'};        // no número (ej. XMAS BREAK) -> gris neutro
+  const n=parseInt(m[1]), maxN=6;                   // B0..B6
+  const t=Math.min(n,maxN)/maxN;                    // 0 (claro) -> 1 (oscuro)
+  const hue=262, sat=52, light=82-t*50;             // 82% -> 32%
+  const bg=`hsl(${hue},${sat}%,${light}%)`;
+  const fg = light>56 ? 'hsl(262,60%,20%)' : 'hsl(262,65%,92%)';
+  return {bg,fg};
+}
+function itemEl(t){
+  const st=stItem(t);
+  const orig=ORIGINAL.find(x=>x.id===t.id);
+  const moved=orig&&orig.due!==t.due;
+  const pv=money(t.price);
+  const bc=blockColor(t.bloque);
+  const hasCash=pv!=null&&pv>0;
+  const el=document.createElement('div');
+  el.className='item'+(openItems[t.id]?' open':'');
+  const priceTag = pv!=null?(pv>0?fm(pv):'—'):(t.price?'<span class="muted" style="font-size:11px">'+esc(t.price)+'</span>':'');
+  const payChip = hasCash ? (t.settled
+      ? `<span class="chip-tr" title="Saldado con trueque/servicio">⇄ trueque</span>`
+      : `<span class="chip-cash" title="Se cobra en efectivo">$ efectivo</span>`) : '';
+  el.innerHTML=`
+    <div class="item-row" draggable="true" data-id="${t.id}">
+      <span class="drag" title="Arrastrar para reordenar">⠿</span>
+      <span class="dot ${st}"></span>
+      ${t.bloque?`<span class="blk" style="background:${bc.bg};color:${bc.fg}" title="Bloque ${esc(t.bloque)} — las tareas del mismo bloque se cobran juntas">${esc(t.bloque)}</span>`:''}
+      <span class="item-title">${esc(t.titulo)}</span>
+      ${payChip}
+      <span class="price-tag ${t.settled?'trueque':''}">${priceTag}</span>
+      <span class="item-date">${pretty(t.due)}</span>
+      <span class="pill ${st}">${STLABEL[st]}</span>
+      <span class="icaret">▶</span>
+    </div>
+    <div class="detail">
+      <div class="drow">
+        <div class="field" style="width:90px"><label>Bloque</label><input data-bloque value="${esc(t.bloque||'')}" placeholder="B1"/></div>
+        <div class="field" style="flex:1;min-width:200px"><label>Título</label><input data-title value="${esc(t.titulo)}" style="width:100%"/></div>
+      </div>
+      <div class="drow">
+        <div class="field"><label>Inicio</label><input type="date" data-start value="${t.start||''}"/></div>
+        <div class="field dur"><label>Duración</label><input type="number" min="1" data-dur value="${t.duration}"/></div>
+        <div class="field"><label>Entrega</label><input type="date" data-due value="${t.due||''}"/></div>
+        <div class="field"><label>Estado</label><select data-status>
+          ${Object.keys(STLABEL).map(k=>`<option value="${k}" ${st===k?'selected':''}>${STLABEL[k]}</option>`).join('')}
+        </select></div>
+        <div class="delay"><div class="field"><label>Retrasar</label><input type="number" data-delayn placeholder="días"/></div>
+          <button class="ghost" data-delay>Empujar</button></div>
+      </div>
+      ${moved?`<div class="moved">Movido ${diffDays(t.due,orig.due)>0?'+':''}${diffDays(t.due,orig.due)} días · original ${pretty(orig.due)}</div>`:''}
+      ${subGroups(t)}
+      <div class="priceline">
+        <div class="field"><label>Precio del bloque</label><input class="money-in" data-price value="${esc(t.price||'')}" placeholder="—"/></div>
+        <label class="toggle"><input type="checkbox" data-settled ${t.settled?'checked':''}/> Saldado (trueque/servicio, no suma a deuda)</label>
+        ${t.pago?`<span class="muted" style="font-size:11px">nota original: ${esc(t.pago)}</span>`:''}
+      </div>
+      <div class="detbtns">
+        <button class="ghost mini" data-moveup title="Subir">↑ Subir</button>
+        <button class="ghost mini" data-movedown title="Bajar">↓ Bajar</button>
+        <span class="spc"></span>
+        <button class="ghost mini danger" data-delitem>🗑 Eliminar ítem</button>
+      </div>
+    </div>`;
+
+  const row=el.querySelector('.item-row');
+  row.addEventListener('click',e=>{
+    if(e.target.closest('input,select,button,.drag'))return;
+    openItems[t.id]=!openItems[t.id];el.classList.toggle('open');
+  });
+  // drag & drop reorder
+  row.addEventListener('dragstart',e=>{dragId=t.id;e.dataTransfer.effectAllowed='move';
+    try{e.dataTransfer.setData('text/plain',String(t.id));}catch(_){}row.classList.add('dragging');});
+  row.addEventListener('dragend',()=>{row.classList.remove('dragging');
+    document.querySelectorAll('.drop-before,.drop-after').forEach(x=>x.classList.remove('drop-before','drop-after'));});
+  row.addEventListener('dragover',e=>{e.preventDefault();
+    const r=row.getBoundingClientRect();const before=e.clientY<r.top+r.height/2;
+    row.classList.toggle('drop-before',before);row.classList.toggle('drop-after',!before);});
+  row.addEventListener('dragleave',()=>row.classList.remove('drop-before','drop-after'));
+  row.addEventListener('drop',e=>{e.preventDefault();
+    const before=row.classList.contains('drop-before');
+    row.classList.remove('drop-before','drop-after');dropOn(dragId,t.id,before);});
+  // title / structural
+  let titleWas=t.titulo, bloqueWas=t.bloque||'';
+  el.querySelector('[data-title]').addEventListener('input',e=>{t.titulo=e.target.value;
+    el.querySelector('.item-title').textContent=e.target.value;save();});
+  el.querySelector('[data-title]').addEventListener('change',e=>{
+    if(e.target.value!==titleWas){logChange('Renombró "'+titleWas+'" → "'+e.target.value+'"');titleWas=e.target.value;save();}});
+  el.querySelector('[data-bloque]').addEventListener('input',e=>{t.bloque=e.target.value;save();});
+  el.querySelector('[data-bloque]').addEventListener('change',e=>{
+    if((e.target.value||'')!==bloqueWas){logChange('Cambió bloque de "'+t.titulo+'" → '+(e.target.value||'—'));bloqueWas=e.target.value||'';save();}render();});
+  el.querySelector('[data-moveup]').addEventListener('click',()=>moveItem(t,-1));
+  el.querySelector('[data-movedown]').addEventListener('click',()=>moveItem(t,1));
+  el.querySelector('[data-delitem]').addEventListener('click',()=>deleteItem(t));
+  el.querySelector('[data-start]').addEventListener('change',e=>setStart(t,e.target.value));
+  el.querySelector('[data-due]').addEventListener('change',e=>setDue(t,e.target.value));
+  el.querySelector('[data-dur]').addEventListener('change',e=>setDur(t,e.target.value));
+  el.querySelector('[data-delay]').addEventListener('click',()=>delayBy(t,el.querySelector('[data-delayn]').value));
+  let priceWas=t.price||'';
+  el.querySelector('[data-status]').addEventListener('change',e=>{t.status=e.target.value;
+    logChange('Marcó "'+t.titulo+'" como '+STLABEL[e.target.value]);commit();});
+  el.querySelector('[data-price]').addEventListener('input',e=>{t.price=e.target.value;save();});
+  el.querySelector('[data-price]').addEventListener('change',e=>{
+    if((e.target.value||'')!==priceWas){logChange('Cambió precio de "'+t.titulo+'" → '+(e.target.value||'—'));priceWas=e.target.value||'';save();}render();});
+  el.querySelector('[data-settled]').addEventListener('change',e=>{t.settled=e.target.checked;
+    logChange((e.target.checked?'Marcó saldado (trueque) ':'Quitó saldado de ')+'"'+t.titulo+'"');commit();});
+  el.querySelectorAll('[data-det]').forEach(cb=>cb.addEventListener('change',e=>{
+    const d=t.details[+e.target.dataset.det];d.done=e.target.checked;
+    logChange((e.target.checked?'Completó':'Desmarcó')+' sub-tarea de "'+t.titulo+'": '+d.text.slice(0,40));save();
+  }));
+  return el;
+}
+
+function subGroups(t){
+  const map={'Fer':'Tareas de Fer','B&G':'Tareas B&G','Reunión':'Reuniones','Entrega':'Entregables'};
+  let html='';
+  Object.keys(map).forEach(lab=>{
+    const items=t.details.map((d,i)=>({d,i})).filter(o=>o.d.label===lab);
+    if(!items.length)return;
+    html+=`<div class="subgroup"><h4>${map[lab]}</h4>`+items.map(o=>`
+      <div class="sub ${o.d.done?'done':''}">
+        <input type="checkbox" data-det="${o.i}" ${o.d.done?'checked':''}/>
+        <span>${esc(o.d.text)}</span>
+        ${o.d.date?`<span class="sd">${pretty(o.d.date)}</span>`:''}
+      </div>`).join('')+`</div>`;
+  });
+  return html;
+}
+
+/* ---------- cuenta ---------- */
+function renderCuenta(){
+  document.getElementById('crono').classList.add('hidden');
+  document.getElementById('cuenta').classList.remove('hidden');
+  const root=document.getElementById('cuenta');
+  const delivered=tasks.filter(t=>stItem(t)==='entregado');
+  const billable=delivered.filter(t=>!t.settled&&money(t.price)!=null);
+  const owed=billable.reduce((s,t)=>s+money(t.price),0);
+  const paid=STATE.payments.reduce((s,p)=>s+(money(p.amount)||0),0);
+  const bal=owed-paid;
+  const balCls=bal>0.005?'debe':(bal<-0.005?'favor':'aldia');
+  const balTxt=bal>0.005?'Fer debe':(bal<-0.005?'Pagó de más':'Al día');
+  const settledCount=delivered.filter(t=>t.settled).length;
+
+  root.innerHTML=`
+    <div class="summary">
+      <div class="scard"><div class="k">Facturado (entregado)</div><div class="v">${fm(owed)}</div>
+        <div class="sub2">${billable.length} bloques cobrables</div></div>
+      <div class="scard"><div class="k">Pagado por Fer</div><div class="v">${fm(paid)}</div>
+        <div class="sub2">${STATE.payments.length} pagos registrados</div></div>
+      <div class="scard bal"><div class="k">Balance</div><div class="v ${balCls}">${fm(Math.abs(bal))}</div>
+        <div class="sub2">${balTxt}${settledCount?` · ${settledCount} saldados por trueque`:''}</div></div>
+    </div>
+
+    <div class="sec">
+      <h3>Entregas facturables</h3>
+      <table><thead><tr><th>Bloque</th><th>Tarea</th><th>Tipo</th><th>Cliente</th><th>Entrega</th><th class="right">Monto</th></tr></thead>
+      <tbody>
+      ${delivered.length?delivered.map(t=>{
+        const pv=money(t.price);
+        const bill=!t.settled&&pv!=null;
+        const bc=blockColor(t.bloque);
+        const cl=clientOf(t.etapa);
+        return `<tr class="${t.settled?'settled':''}">
+          <td>${t.bloque?`<span class="blk" style="background:${bc.bg};color:${bc.fg}">${esc(t.bloque)}</span>`:'<span class="muted">—</span>'}</td>
+          <td>${esc(t.titulo)}${t.settled?'<span class="tag tr">trueque</span>':''}</td>
+          <td class="muted">${esc(typeOf(t.etapa))}</td>
+          <td><span class="cl ${cl==='TusCFO'?'cfo':'fer'}">${cl}</span></td>
+          <td class="muted">${pretty(t.due)}</td>
+          <td class="amt">${bill?fm(pv):(pv!=null?'<span class="muted">'+fm(pv)+'</span>':'<span class="muted">'+esc(t.price||'—')+'</span>')}</td>
+        </tr>`;}).join(''):'<tr><td colspan="6" class="muted">Aún no hay bloques entregados. Marca un ítem como “Entregado” en el cronograma.</td></tr>'}
+      </tbody></table>
+    </div>
+
+    <div class="sec">
+      <h3>Pagos de Fer</h3>
+      <table><thead><tr><th>Fecha</th><th>Monto</th><th>Nota</th><th></th></tr></thead>
+      <tbody id="paybody">
+      ${STATE.payments.length?STATE.payments.map((p,i)=>`
+        <tr class="payrow">
+          <td><input type="date" data-pi="${i}" data-pf="date" value="${p.date||''}"/></td>
+          <td><input class="money-in" data-pi="${i}" data-pf="amount" value="${esc(p.amount||'')}" placeholder="$"/></td>
+          <td><input style="width:100%" data-pi="${i}" data-pf="note" value="${esc(p.note||'')}" placeholder="ej: transferencia parcial"/></td>
+          <td class="right"><button class="iconbtn" data-del="${i}" title="Eliminar">✕</button></td>
+        </tr>`).join(''):'<tr><td colspan="4" class="muted">Sin pagos todavía.</td></tr>'}
+      </tbody></table>
+      <div class="payadd">
+        <div class="field"><label>Fecha</label><input type="date" id="np-date"/></div>
+        <div class="field"><label>Monto</label><input class="money-in" id="np-amount" placeholder="$"/></div>
+        <div class="field" style="flex:1;min-width:160px"><label>Nota</label><input id="np-note" style="width:100%" placeholder="opcional"/></div>
+        <button class="primary" id="np-add">Agregar pago</button>
+      </div>
+    </div>`;
+
+  root.querySelectorAll('[data-pf]').forEach(inp=>{
+    inp.addEventListener('input',e=>{
+      STATE.payments[+inp.dataset.pi][inp.dataset.pf]=inp.value;save();
+      if(inp.dataset.pf==='amount'){clearTimeout(window._pr);window._pr=setTimeout(renderCuenta,600);}
+    });
+    inp.addEventListener('change',()=>logChange('Editó un pago de Fer'));
+  });
+  root.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>{
+    const p=STATE.payments[+b.dataset.del]||{};
+    logChange('Eliminó pago '+(money(p.amount)!=null?fm(money(p.amount)):''));
+    STATE.payments.splice(+b.dataset.del,1);save();renderCuenta();}));
+  root.querySelector('#np-add').addEventListener('click',()=>{
+    const a=root.querySelector('#np-amount').value;
+    if(!money(a)){toast('Ingresá un monto');return;}
+    const note=root.querySelector('#np-note').value;
+    STATE.payments.push({date:root.querySelector('#np-date').value||fmt(new Date()),amount:a,note});
+    logChange('Agregó pago '+fm(money(a))+(note?' ('+note+')':''));
+    save();renderCuenta();toast('Pago agregado');
+  });
+}
+function shortProj(e){return e.replace(/^\d+-\s*/,'');}
+function typeOf(e){e=(e||'').toLowerCase();
+  if(e.includes('marca'))return 'Marca';
+  if(e.includes('web')||e.includes('sitio'))return 'Web';
+  if(e.includes('assets'))return 'Assets';
+  return shortProj(e);}
+function clientOf(e){return /tuscfo/i.test(e||'')?'TusCFO':'Fer';}
+
+/* ---------- historial ---------- */
+function flag(cc){if(!cc||cc.length!==2)return '🏳️';try{return String.fromCodePoint(...[...cc.toUpperCase()].map(c=>127397+c.charCodeAt(0)));}catch(e){return '🏳️';}}
+function histWhen(ts){const d=new Date(ts);return d.toLocaleString('es-ES',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});}
+function renderHistorial(){
+  const root=document.getElementById('historial');
+  const q=document.getElementById('search').value.toLowerCase().trim();
+  let h=[...(STATE.history||[])].reverse();
+  if(q)h=h.filter(e=>((e.name||'')+' '+(e.action||'')+' '+(e.country||'')).toLowerCase().includes(q));
+  root.innerHTML=`<div class="sec"><h3>Historial de cambios ${sync.mode!=='server'?'· local (no compartido)':''} <span class="muted" style="font-weight:400">— ${STATE.history?STATE.history.length:0} registros</span></h3>
+    <div class="hist">${h.length?h.map(e=>`
+      <div class="hitem">
+        <span class="hwhen">${histWhen(e.ts)}</span>
+        <span class="hwho">${esc(e.name||'—')}<span class="hcountry">${e.country?flag(e.country)+' '+esc(e.country):''}</span></span>
+        <span class="haction">${esc(e.action||'')}</span>
+      </div>`).join(''):'<div class="hempty">Todavía no hay cambios registrados.</div>'}</div></div>`;
+}
+
+/* ---------- sync layer ---------- */
+const CLIENT_PASS='FER-BYG';
+function setSyncUI(mode){
+  const dot=document.getElementById('syncdot'),msg=document.getElementById('syncmsg');
+  if(!dot)return;
+  if(sync.mode!=='server'){dot.className='syncdot local';msg.textContent='Local (no compartido)';return;}
+  if(mode==='off'){dot.className='syncdot off';msg.textContent='Sin conexión';}
+  else{dot.className='syncdot on';msg.textContent='En vivo';}
+}
+async function apiGet(){
+  const r=await fetch('/api/data',{headers:{'x-app-pass':session.pass}});
+  return r.json();
+}
+async function apiPost(entries){
+  const body={password:session.pass,name:session.name,tasks:STATE.tasks,payments:STATE.payments,entries};
+  const r=await fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(r.status===403){throw new Error('403');}
+  return r.json();
+}
+function scheduleSync(){
+  if(sync.mode!=='server'){
+    if(pendingEntries.length){
+      const now=Date.now();
+      pendingEntries.splice(0).forEach(e=>STATE.history.push({ts:now,name:session.name||'local',country:session.country||'',action:e.action}));
+      STATE.history=STATE.history.slice(-800);cacheLocal();
+      if(tab==='historial')renderHistorial();
+    }
+    return;
+  }
+  sync.dirty=true;clearTimeout(sync.pushTimer);sync.pushTimer=setTimeout(pushSync,900);
+}
+async function pushSync(){
+  if(sync.mode!=='server'||sync.busy)return;
+  sync.busy=true;
+  const entries=pendingEntries.splice(0,pendingEntries.length);
+  try{
+    const res=await apiPost(entries);
+    if(res&&res.ok){sync.version=res.version;STATE.history=res.history||STATE.history;sync.dirty=false;
+      setSyncUI('on');cacheLocal();if(tab==='historial')renderHistorial();}
+    else{pendingEntries.unshift(...entries);setSyncUI('off');}
+  }catch(e){pendingEntries.unshift(...entries);setSyncUI('off');}
+  sync.busy=false;
+}
+function startPoll(){
+  clearInterval(sync.poll);
+  sync.poll=setInterval(async()=>{
+    if(sync.mode!=='server'||sync.busy||sync.dirty||pendingEntries.length)return;
+    try{const res=await apiGet();
+      if(res&&res.ok&&res.configured!==false&&(res.version||0)>sync.version){
+        setState(res);cacheLocal();render();toast('Actualizado con cambios de otros');}
+      setSyncUI('on');
+    }catch(e){setSyncUI('off');}
+  },6000);
+  window.addEventListener('focus',()=>{
+    if(sync.mode==='server'&&!sync.dirty&&!pendingEntries.length&&!sync.busy){
+      apiGet().then(res=>{if(res&&res.ok&&(res.version||0)>sync.version){setState(res);cacheLocal();render();}}).catch(()=>{});
+    }
+  });
+}
+function detectCountry(){
+  fetch('https://ipwho.is/?fields=country_code').then(r=>r.json()).then(j=>{if(j&&j.country_code)session.country=j.country_code;}).catch(()=>{});
+}
+
+/* ---------- login / boot ---------- */
+function showApp(){document.getElementById('overlay').style.display='none';
+  document.getElementById('uchip').textContent=session.name||'';}
+function bootLocal(){
+  const local=loadLocal();
+  setState(local||{tasks:initTasks(ORIGINAL),payments:[],history:[]});
+  setSyncUI('local');
+}
+async function enter(errEl){
+  detectCountry();
+  let res=null;
+  try{res=await apiGet();}catch(e){res=null;}
+  if(res&&res.ok===false){ if(errEl)errEl.textContent='Clave incorrecta.'; session.pass=''; return; }
+  if(!res||res.configured===false){
+    if(session.pass!==CLIENT_PASS){ if(errEl)errEl.textContent='Clave incorrecta.'; session.pass=''; return; }
+    sync.mode='local';sessionStorage.setItem(SESKEY,JSON.stringify(session));
+    bootLocal();showApp();render();
+    toast(res?'Modo local: almacenamiento aún no conectado':'Sin conexión: modo local');
+    return;
+  }
+  // server ok + pass valid
+  sync.mode='server';sessionStorage.setItem(SESKEY,JSON.stringify(session));
+  if(res.empty){
+    const local=loadLocal();
+    setState(local||{tasks:initTasks(ORIGINAL),payments:[],history:[]});
+    pendingEntries.push({action:'Inició el plan compartido'});
+    await pushSync();
+  }else{setState(res);}
+  cacheLocal();showApp();setSyncUI('on');startPoll();render();
+}
+async function doLogin(){
+  const name=document.getElementById('lg-name').value.trim();
+  const pass=document.getElementById('lg-pass').value;
+  const err=document.getElementById('lg-err');
+  if(!name){err.textContent='Poné tu nombre.';return;}
+  if(!pass){err.textContent='Poné la clave.';return;}
+  session.name=name;session.pass=pass;err.textContent='Entrando…';
+  await enter(err);
+}
+function boot(){
+  try{const s=JSON.parse(sessionStorage.getItem(SESKEY)||'null');if(s&&s.pass&&s.name){session=s;}}catch(e){}
+  if(session.pass&&session.name){enter();}
+}
+
+/* ---------- exports ---------- */
+function exportJSON(){dl('timeline_ferbolagay.json',JSON.stringify(STATE,null,2),'application/json');}
+function exportCSV(){
+  const rows=[['id','proyecto','bloque','titulo','inicio','duracion','entrega','estado','saldado','precio']];
+  [...tasks].sort((a,b)=>a.order-b.order).forEach(t=>rows.push([t.id,t.etapa,t.bloque,t.titulo,t.start,t.duration,t.due,STLABEL[stItem(t)],t.settled?'sí':'no',t.price]));
+  rows.push([]);rows.push(['PAGOS DE FER']);rows.push(['fecha','monto','nota']);
+  STATE.payments.forEach(p=>rows.push([p.date,p.amount,p.note]));
+  const csv=rows.map(r=>r.map(c=>{c=String(c==null?'':c);return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c;}).join(',')).join('\n');
+  dl('timeline_ferbolagay.csv','﻿'+csv,'text/csv');
+}
+function dl(n,c,t){const b=new Blob([c],{type:t}),u=URL.createObjectURL(b),a=document.createElement('a');
+  a.href=u;a.download=n;a.click();URL.revokeObjectURL(u);toast('Descargado '+n);}
+
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* wiring */
+document.getElementById('search').addEventListener('input',()=>{if(tab==='crono')renderCrono();else if(tab==='historial')renderHistorial();});
+document.getElementById('expjson').addEventListener('click',exportJSON);
+document.getElementById('expcsv').addEventListener('click',exportCSV);
+document.getElementById('reset').addEventListener('click',()=>{
+  if(!confirm('¿Reiniciar tareas y pagos a los datos originales? Esto afecta a todos. El historial se conserva.'))return;
+  setState({tasks:initTasks(ORIGINAL),payments:[],history:STATE.history,version:sync.version});
+  logChange('Reinició el plan a los datos originales');save();render();toast('Reiniciado');
+});
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+  tab=b.dataset.tab;render();}));
+document.getElementById('crono').addEventListener('click',e=>{
+  const h=e.target.closest('.proj-h');if(h){collapsed[h.dataset.g]=!collapsed[h.dataset.g];renderCrono();}});
+document.getElementById('lg-btn').addEventListener('click',doLogin);
+document.getElementById('lg-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.getElementById('lg-name').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('lg-pass').focus();});
+boot();
+</script>
+</body>
+</html>
