@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: bloques compactos por defecto al abrir (v7) -->
+<!-- build: linea amarilla lateral en bloques en progreso (v8) -->
 <html lang="es">
 <head>
 <meta charset="utf-8"/>
@@ -55,6 +55,7 @@ button.primary{background:var(--accent2);border-color:var(--accent2);color:#fff;
 .items{display:flex;flex-direction:column}
 .block{border-top:1px solid var(--line);border-left:3px solid #2f3542;background:#15181f}
 .block.bdone{border-left-color:var(--done)}
+.block.bprog{border-left-color:var(--prog)}
 .block-h{display:flex;align-items:center;gap:9px;padding:7px 14px;background:#1a1e26;flex-wrap:wrap;cursor:pointer}
 .block-h:hover{background:#1d222b}
 .bcaret{color:var(--muted);font-size:11px;transition:.2s;flex-shrink:0}
@@ -476,8 +477,9 @@ function blockEl(blk){
   const key=blockKey(etapa,blk.bloque);
   const q=document.getElementById('search').value.trim();
   const isColl = q ? false : ((key in blockCollapsed) ? blockCollapsed[key] : true); // compacto por defecto
+  const started = !agg.done && (agg.doneCount>0 || blk.items.some(t=>stItem(t)==='prog'));
   const wrap=document.createElement('div');
-  wrap.className='block'+(agg.done?' bdone':'')+(isColl?' bcollapsed':'');
+  wrap.className='block'+(agg.done?' bdone':(started?' bprog':''))+(isColl?' bcollapsed':'');
   const priceInfo = (agg.hasPrice||agg.tq>0)
     ? `<span class="block-price">${fm(agg.price)}${agg.cash>0?` · <b>${fm(agg.cash)}</b> efvo`:''}${agg.tq>0?` · <span class="tq">${fm(agg.tq)} trueque</span>`:''}</span>`
     : '';
