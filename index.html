@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: bloques agrupados + cobro por bloque completo (v3) -->
+<!-- build: montos al bloque + titulos de bloque + compactar + items limpios (v4) -->
 <html lang="es">
 <head>
 <meta charset="utf-8"/>
@@ -45,7 +45,16 @@ button.primary{background:var(--accent2);border-color:var(--accent2);color:#fff;
 .items{display:flex;flex-direction:column}
 .block{border-top:1px solid var(--line);border-left:3px solid #2f3542;background:#15181f}
 .block.bdone{border-left-color:var(--done)}
-.block-h{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#1a1e26;flex-wrap:wrap}
+.block-h{display:flex;align-items:center;gap:9px;padding:7px 14px;background:#1a1e26;flex-wrap:wrap;cursor:pointer}
+.block-h:hover{background:#1d222b}
+.bcaret{color:var(--muted);font-size:11px;transition:.2s;flex-shrink:0}
+.block.bcollapsed .bcaret{transform:rotate(-90deg)}
+.block.bcollapsed .block-items{display:none}
+.block-title{background:transparent;border:1px solid transparent;border-radius:6px;padding:3px 8px;color:var(--txt);
+  font-size:13px;font-weight:600;min-width:120px;max-width:260px}
+.block-title::placeholder{color:#5a6474;font-weight:400}
+.block-title:hover{border-color:var(--line)}
+.block-title:focus{border-color:var(--accent);background:var(--panel2);outline:none}
 .block-price{font-size:12px;color:var(--muted)}.block-price b{color:var(--cash)}.block-price .tq{color:var(--trueque)}
 .spc2{flex:1}
 .bstat{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:#2b3040;color:var(--prog);white-space:nowrap}
@@ -200,6 +209,7 @@ tr.settled td.amt{color:var(--trueque)}
       <span class="uchip" id="uchip"></span></div>
     <input class="search" id="search" placeholder="Buscar…"/>
     <label class="toggle"><input type="checkbox" id="cascade" checked/> Auto-empujar</label>
+    <button class="ghost" id="compact" title="Compactar / expandir bloques">⊟ Bloques</button>
     <button class="ghost" id="expcsv">CSV</button>
     <button class="ghost" id="expjson">JSON</button>
     <button class="ghost danger" id="reset">Reiniciar</button>
@@ -224,10 +234,11 @@ const SESKEY = "ferbyg_session";
 let session = {name:'', pass:'', country:''};
 let sync = {configured:false, on:false, mode:'local', version:0, pushTimer:null, poll:null, busy:false, dirty:false};
 let pendingEntries = [];
-let STATE = {tasks:[], payments:[], history:[]};
+let STATE = {tasks:[], payments:[], history:[], blockTitles:{}};
 let tasks = [];
 let openItems = {};
 let collapsed = {};
+let blockCollapsed = {};
 let tab = "crono";
 let dragId = null;
 
@@ -245,11 +256,14 @@ function setState(s){
   STATE = {
     tasks: (s.tasks && s.tasks.length) ? s.tasks : initTasks(ORIGINAL),
     payments: s.payments || [],
+    blockTitles: s.blockTitles || {},
     history: s.history || []
   };
   tasks = STATE.tasks;
   sync.version = s.version || 0;
 }
+function blockKey(etapa,bloque){return (etapa||'')+'||'+(bloque||'');}
+function blockTitle(etapa,bloque){return (STATE.blockTitles&&STATE.blockTitles[blockKey(etapa,bloque)])||'';}
 function cacheLocal(){try{localStorage.setItem(LSKEY,JSON.stringify({...STATE,version:sync.version}));}catch(e){}}
 function loadLocal(){try{const s=localStorage.getItem(LSKEY);if(s)return JSON.parse(s);}catch(e){}return null;}
 function save(){cacheLocal();scheduleSync();}
@@ -394,20 +408,33 @@ function renderCrono(){
 function blockEl(blk){
   const agg=blockAgg(blk.items);
   const bc=blockColor(blk.bloque);
+  const etapa=blk.items[0]?blk.items[0].etapa:'';
+  const key=blockKey(etapa,blk.bloque);
+  const isColl=!!blockCollapsed[key];
   const wrap=document.createElement('div');
-  wrap.className='block'+(agg.done?' bdone':'');
+  wrap.className='block'+(agg.done?' bdone':'')+(isColl?' bcollapsed':'');
   const priceInfo = (agg.hasPrice||agg.tq>0)
-    ? `<span class="block-price">Bloque ${fm(agg.price)}${agg.cash>0?` · <b>${fm(agg.cash)}</b> efvo`:''}${agg.tq>0?` · <span class="tq">${fm(agg.tq)} trueque</span>`:''}</span>`
+    ? `<span class="block-price">${fm(agg.price)}${agg.cash>0?` · <b>${fm(agg.cash)}</b> efvo`:''}${agg.tq>0?` · <span class="tq">${fm(agg.tq)} trueque</span>`:''}</span>`
     : '';
   const stat = blk.bloque
-    ? (agg.done?`<span class="bstat done">✓ bloque completo</span>`:`<span class="bstat">${agg.doneCount}/${agg.total} tareas</span>`)
+    ? (agg.done?`<span class="bstat done">✓ completo</span>`:`<span class="bstat">${agg.doneCount}/${agg.total}</span>`)
     : '';
   wrap.innerHTML=`<div class="block-h">
+      <span class="bcaret">▾</span>
       ${blk.bloque?`<span class="blk" style="background:${bc.bg};color:${bc.fg}">${esc(blk.bloque)}</span>`:'<span class="muted" style="font-size:11px">sin bloque</span>'}
+      <input class="block-title" data-btitle placeholder="Título del bloque…" value="${esc(blockTitle(etapa,blk.bloque))}"/>
       ${priceInfo}<span class="spc2"></span>${stat}
     </div><div class="block-items"></div>`;
   const bi=wrap.querySelector('.block-items');
   blk.items.forEach(t=>bi.appendChild(itemEl(t)));
+  wrap.querySelector('.block-h').addEventListener('click',e=>{
+    if(e.target.closest('input'))return;
+    blockCollapsed[key]=!blockCollapsed[key];renderCrono();
+  });
+  const ti=wrap.querySelector('[data-btitle]');
+  let bwas=blockTitle(etapa,blk.bloque);
+  ti.addEventListener('input',e=>{if(!STATE.blockTitles)STATE.blockTitles={};STATE.blockTitles[key]=e.target.value;save();});
+  ti.addEventListener('change',e=>{if(e.target.value!==bwas){logChange('Tituló bloque '+(blk.bloque||'')+' → "'+e.target.value+'"');bwas=e.target.value;save();}});
   return wrap;
 }
 
@@ -460,10 +487,7 @@ function itemEl(t){
     <div class="item-row" draggable="true" data-id="${t.id}">
       <span class="drag" title="Arrastrar para reordenar">⠿</span>
       <span class="dot ${st}"></span>
-      ${t.bloque?`<span class="blk" style="background:${bc.bg};color:${bc.fg}" title="Bloque ${esc(t.bloque)} — las tareas del mismo bloque se cobran juntas">${esc(t.bloque)}</span>`:''}
       <span class="item-title">${esc(t.titulo)}</span>
-      ${payChip}
-      <span class="price-tag ${priceCls}">${priceTag}</span>
       <span class="item-date">${pretty(t.due)}</span>
       <span class="pill ${st}">${STLABEL[st]}</span>
       <span class="icaret">▶</span>
@@ -709,7 +733,7 @@ async function apiGet(){
   return r.json();
 }
 async function apiPost(entries){
-  const body={password:session.pass,name:session.name,tasks:STATE.tasks,payments:STATE.payments,entries};
+  const body={password:session.pass,name:session.name,tasks:STATE.tasks,payments:STATE.payments,blockTitles:STATE.blockTitles,entries};
   const r=await fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json','x-app-pass':session.pass},body:JSON.stringify(body)});
   if(r.status===403){throw new Error('403');}
   return r.json();
@@ -825,8 +849,17 @@ document.getElementById('expjson').addEventListener('click',exportJSON);
 document.getElementById('expcsv').addEventListener('click',exportCSV);
 document.getElementById('reset').addEventListener('click',()=>{
   if(!confirm('¿Reiniciar tareas y pagos a los datos originales? Esto afecta a todos. El historial se conserva.'))return;
-  setState({tasks:initTasks(ORIGINAL),payments:[],history:STATE.history,version:sync.version});
+  setState({tasks:initTasks(ORIGINAL),payments:[],blockTitles:STATE.blockTitles,history:STATE.history,version:sync.version});
   logChange('Reinició el plan a los datos originales');save();render();toast('Reiniciado');
+});
+document.getElementById('compact').addEventListener('click',()=>{
+  const keys=[];[...new Set(tasks.map(t=>t.etapa))].forEach(e=>{
+    const items=tasks.filter(t=>t.etapa===e).sort((a,b)=>a.order-b.order);
+    chunkBlocks(items).forEach(blk=>keys.push(blockKey(e,blk.bloque)));});
+  const anyOpen=keys.some(k=>!blockCollapsed[k]);
+  keys.forEach(k=>blockCollapsed[k]=anyOpen);
+  if(tab!=='crono'){tab='crono';document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab==='crono'));}
+  render();
 });
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');

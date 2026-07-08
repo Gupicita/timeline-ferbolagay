@@ -63,6 +63,7 @@ export default async function handler(req, res) {
         version,
         tasks: Array.isArray(body.tasks) ? body.tasks : current.tasks,
         payments: Array.isArray(body.payments) ? body.payments : current.payments,
+        blockTitles: (body.blockTitles && typeof body.blockTitles === 'object') ? body.blockTitles : (current.blockTitles || {}),
         history
       };
       await redis.set(KEY, JSON.stringify(state));
