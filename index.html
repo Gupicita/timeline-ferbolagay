@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: linea amarilla lateral en bloques en progreso (v8) -->
+<!-- build: ordenar columnas + filtrar en cuenta de fer (v9) -->
 <html lang="es">
 <head>
 <meta charset="utf-8"/>
@@ -148,6 +148,14 @@ tr.pending td{color:var(--muted)}
 .scard .sub2{font-size:11px;color:var(--muted);margin-top:3px}
 .sec{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px}
 .sec h3{margin:0 0 10px;font-size:13px}
+.sechead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+.sechead h3{margin:0}
+.cfilter{display:flex;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:2px}
+.fbtn{background:transparent;border:none;color:var(--muted);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer}
+.fbtn:hover{color:var(--txt)}
+.fbtn.on{background:var(--accent2);color:#fff}
+th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+th.sortable:hover{color:var(--txt)}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;
   letter-spacing:.4px;padding:6px 8px;border-bottom:1px solid var(--line)}
@@ -250,6 +258,8 @@ let tasks = [];
 let openItems = {};
 let collapsed = {};
 let blockCollapsed = {};
+let cuentaSort = {col:null, dir:1};
+let cuentaFilter = 'all';
 let tab = "crono";
 let dragId = null;
 
@@ -698,6 +708,22 @@ function renderCuenta(){
   const balCls=bal>0.005?'debe':(bal<-0.005?'favor':'aldia');
   const balTxt=bal>0.005?'Fer debe':(bal<-0.005?'Pagó de más':'Al día');
 
+  // filtro + orden de la tabla
+  let rows=blocks.slice();
+  if(cuentaFilter==='done')rows=rows.filter(b=>b.agg.done);
+  else if(cuentaFilter==='pending')rows=rows.filter(b=>!b.agg.done);
+  function sortVal(b,col){
+    if(col==='bloque'){const m=/(\d+)/.exec(b.bloque||'');return m?parseInt(m[1]):999;}
+    if(col==='proyecto')return typeOf(b.etapa);
+    if(col==='cliente')return clientOf(b.etapa);
+    if(col==='estado')return b.agg.done?2:(b.agg.doneCount>0?1:0);
+    if(col==='cobrable')return b.agg.cash||0;
+    return 0;
+  }
+  if(cuentaSort.col)rows.sort((a,b)=>{const va=sortVal(a,cuentaSort.col),vb=sortVal(b,cuentaSort.col);
+    return (va<vb?-1:va>vb?1:0)*cuentaSort.dir;});
+  const arrow=c=>cuentaSort.col===c?(cuentaSort.dir>0?' ▲':' ▼'):'';
+
   root.innerHTML=`
     <div class="summary">
       <div class="scard"><div class="k">Facturado (bloques completos)</div><div class="v">${fm(owed)}</div>
@@ -709,10 +735,22 @@ function renderCuenta(){
     </div>
 
     <div class="sec">
-      <h3>Bloques y cobros</h3>
-      <table><thead><tr><th>Bloque</th><th>Proyecto</th><th>Cliente</th><th>Estado</th><th class="right">Cobrable</th></tr></thead>
+      <div class="sechead"><h3>Bloques y cobros</h3>
+        <div class="cfilter">
+          <button class="fbtn ${cuentaFilter==='all'?'on':''}" data-cf="all">Todos</button>
+          <button class="fbtn ${cuentaFilter==='done'?'on':''}" data-cf="done">Completos</button>
+          <button class="fbtn ${cuentaFilter==='pending'?'on':''}" data-cf="pending">Pendientes</button>
+        </div>
+      </div>
+      <table><thead><tr>
+        <th class="sortable" data-scol="bloque">Bloque${arrow('bloque')}</th>
+        <th class="sortable" data-scol="proyecto">Proyecto${arrow('proyecto')}</th>
+        <th class="sortable" data-scol="cliente">Cliente${arrow('cliente')}</th>
+        <th class="sortable" data-scol="estado">Estado${arrow('estado')}</th>
+        <th class="sortable right" data-scol="cobrable">Cobrable${arrow('cobrable')}</th>
+      </tr></thead>
       <tbody>
-      ${blocks.length?blocks.map(b=>{
+      ${rows.length?rows.map(b=>{
         const bc=blockColor(b.bloque);const cl=clientOf(b.etapa);const done=b.agg.done;
         const tqtag=b.agg.tq>0?`<span class="tag tr">trueque ${fm(b.agg.tq)}</span>`:'';
         const amt = b.agg.cash>0 ? (done?fm(b.agg.cash):`<span class="muted">${fm(b.agg.cash)} pend.</span>`) : (b.agg.tq>0?tqtag:'—');
@@ -722,7 +760,7 @@ function renderCuenta(){
           <td><span class="cl ${cl==='TusCFO'?'cfo':'fer'}">${cl}</span></td>
           <td>${done?'<span class="bstat done">✓ completo</span>':`<span class="bstat">${b.agg.doneCount}/${b.agg.total} tareas</span>`}</td>
           <td class="amt">${done&&b.agg.tq>0&&b.agg.cash>0?tqtag+' ':''}${amt}</td>
-        </tr>`;}).join(''):'<tr><td colspan="5" class="muted">No hay bloques con precio todavía.</td></tr>'}
+        </tr>`;}).join(''):'<tr><td colspan="5" class="muted">No hay bloques que coincidan.</td></tr>'}
       </tbody></table>
       <div class="muted" style="font-size:11px;margin-top:8px">El monto de un bloque recién se factura cuando todas sus tareas están en “Entregado”.</div>
     </div>
@@ -746,6 +784,13 @@ function renderCuenta(){
         <button class="primary" id="np-add">Agregar pago</button>
       </div>
     </div>`;
+
+  root.querySelectorAll('[data-scol]').forEach(th=>th.addEventListener('click',()=>{
+    const c=th.dataset.scol;
+    if(cuentaSort.col===c)cuentaSort.dir*=-1;else{cuentaSort.col=c;cuentaSort.dir=1;}
+    renderCuenta();
+  }));
+  root.querySelectorAll('[data-cf]').forEach(b=>b.addEventListener('click',()=>{cuentaFilter=b.dataset.cf;renderCuenta();}));
 
   root.querySelectorAll('[data-pf]').forEach(inp=>{
     inp.addEventListener('input',e=>{
