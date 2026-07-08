@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: notas + subtareas + trueque parcial + timings por grupo (v2) -->
+<!-- build: bloques agrupados + cobro por bloque completo (v3) -->
 <html lang="es">
 <head>
 <meta charset="utf-8"/>
@@ -43,6 +43,16 @@ button.primary{background:var(--accent2);border-color:var(--accent2);color:#fff;
 .proj.collapsed .items{display:none}
 .proj-h .pm{font-size:12px;color:var(--muted)}
 .items{display:flex;flex-direction:column}
+.block{border-top:1px solid var(--line);border-left:3px solid #2f3542;background:#15181f}
+.block.bdone{border-left-color:var(--done)}
+.block-h{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#1a1e26;flex-wrap:wrap}
+.block-price{font-size:12px;color:var(--muted)}.block-price b{color:var(--cash)}.block-price .tq{color:var(--trueque)}
+.spc2{flex:1}
+.bstat{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:#2b3040;color:var(--prog);white-space:nowrap}
+.bstat.done{background:#173026;color:var(--done)}
+.block-items{display:flex;flex-direction:column}
+.block-items .item:first-child{border-top:none}
+tr.pending td{color:var(--muted)}
 .item{border-top:1px solid var(--line)}
 .item-row{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer}
 .item-row:hover{background:#1c202a}
@@ -330,6 +340,21 @@ function deleteItem(t){
 /* status of item */
 function stItem(t){return t.status||'todo';}
 
+/* ---------- bloques: el precio es POR BLOQUE ---------- */
+// agrupa ítems consecutivos con el mismo bloque (ya ordenados)
+function chunkBlocks(items){
+  const out=[];let cur=null;
+  items.forEach(t=>{const b=t.bloque||'';if(!cur||cur.bloque!==b){cur={bloque:b,items:[]};out.push(cur);}cur.items.push(t);});
+  return out;
+}
+// suma precios/efectivo/trueque del bloque y su completitud
+function blockAgg(items){
+  let price=0,cash=0,tq=0,hasPrice=false;
+  items.forEach(t=>{const p=money(t.price);if(p!=null){hasPrice=true;price+=p;}const c=cashOwed(t);if(c!=null)cash+=c;tq+=truequeAmt(t);});
+  const doneCount=items.filter(t=>stItem(t)==='entregado').length;
+  return {price,cash,tq,hasPrice,doneCount,total:items.length,done:items.length>0&&doneCount===items.length};
+}
+
 /* ---------- render ---------- */
 function render(){
   document.getElementById('crono').classList.toggle('hidden',tab!=='crono');
@@ -360,10 +385,30 @@ function renderCrono(){
       <div class="items"></div>
       <button class="additem" data-addto="${esc(g)}">+ Añadir ítem a ${esc(g)}</button>`;
     const box=pj.querySelector('.items');
-    gt.forEach(t=>box.appendChild(itemEl(t)));
+    chunkBlocks(gt).forEach(blk=>box.appendChild(blockEl(blk)));
     pj.querySelector('[data-addto]').addEventListener('click',()=>addItem(g));
     root.appendChild(pj);
   });
+}
+
+function blockEl(blk){
+  const agg=blockAgg(blk.items);
+  const bc=blockColor(blk.bloque);
+  const wrap=document.createElement('div');
+  wrap.className='block'+(agg.done?' bdone':'');
+  const priceInfo = (agg.hasPrice||agg.tq>0)
+    ? `<span class="block-price">Bloque ${fm(agg.price)}${agg.cash>0?` · <b>${fm(agg.cash)}</b> efvo`:''}${agg.tq>0?` · <span class="tq">${fm(agg.tq)} trueque</span>`:''}</span>`
+    : '';
+  const stat = blk.bloque
+    ? (agg.done?`<span class="bstat done">✓ bloque completo</span>`:`<span class="bstat">${agg.doneCount}/${agg.total} tareas</span>`)
+    : '';
+  wrap.innerHTML=`<div class="block-h">
+      ${blk.bloque?`<span class="blk" style="background:${bc.bg};color:${bc.fg}">${esc(blk.bloque)}</span>`:'<span class="muted" style="font-size:11px">sin bloque</span>'}
+      ${priceInfo}<span class="spc2"></span>${stat}
+    </div><div class="block-items"></div>`;
+  const bi=wrap.querySelector('.block-items');
+  blk.items.forEach(t=>bi.appendChild(itemEl(t)));
+  return wrap;
 }
 
 function blockColor(b){
@@ -539,47 +584,50 @@ function renderCuenta(){
   document.getElementById('crono').classList.add('hidden');
   document.getElementById('cuenta').classList.remove('hidden');
   const root=document.getElementById('cuenta');
-  const delivered=tasks.filter(t=>stItem(t)==='entregado');
-  const billable=delivered.filter(t=>cashOwed(t)!=null&&cashOwed(t)>0);
-  const owed=billable.reduce((s,t)=>s+cashOwed(t),0);
-  const truequeTotal=delivered.reduce((s,t)=>s+truequeAmt(t),0);
+  // el precio es POR BLOQUE: solo cuenta como facturado cuando TODAS las tareas del bloque están entregadas
+  const projs=[...new Set(tasks.map(t=>t.etapa))];
+  const blocks=[];
+  projs.forEach(e=>{
+    const items=tasks.filter(t=>t.etapa===e).sort((a,b)=>a.order-b.order);
+    chunkBlocks(items).forEach(blk=>{const agg=blockAgg(blk.items);
+      if(agg.hasPrice||agg.tq>0)blocks.push({etapa:e,bloque:blk.bloque,agg});});
+  });
+  const owed=blocks.filter(b=>b.agg.done).reduce((s,b)=>s+b.agg.cash,0);
+  const pending=blocks.filter(b=>!b.agg.done).reduce((s,b)=>s+b.agg.cash,0);
+  const truequeTotal=blocks.filter(b=>b.agg.done).reduce((s,b)=>s+b.agg.tq,0);
+  const completos=blocks.filter(b=>b.agg.done&&b.agg.cash>0).length;
   const paid=STATE.payments.reduce((s,p)=>s+(money(p.amount)||0),0);
   const bal=owed-paid;
   const balCls=bal>0.005?'debe':(bal<-0.005?'favor':'aldia');
   const balTxt=bal>0.005?'Fer debe':(bal<-0.005?'Pagó de más':'Al día');
-  const settledCount=delivered.filter(t=>truequeAmt(t)>0).length;
 
   root.innerHTML=`
     <div class="summary">
-      <div class="scard"><div class="k">Facturado en efectivo</div><div class="v">${fm(owed)}</div>
-        <div class="sub2">${billable.length} bloques cobrables${truequeTotal>0?` · ${fm(truequeTotal)} en trueque`:''}</div></div>
+      <div class="scard"><div class="k">Facturado (bloques completos)</div><div class="v">${fm(owed)}</div>
+        <div class="sub2">${completos} bloques completos${pending>0?` · ${fm(pending)} por entregar`:''}${truequeTotal>0?` · ${fm(truequeTotal)} en trueque`:''}</div></div>
       <div class="scard"><div class="k">Pagado por Fer</div><div class="v">${fm(paid)}</div>
         <div class="sub2">${STATE.payments.length} pagos registrados</div></div>
       <div class="scard bal"><div class="k">Balance</div><div class="v ${balCls}">${fm(Math.abs(bal))}</div>
-        <div class="sub2">${balTxt}${settledCount?` · ${settledCount} saldados por trueque`:''}</div></div>
+        <div class="sub2">${balTxt}</div></div>
     </div>
 
     <div class="sec">
-      <h3>Entregas facturables</h3>
-      <table><thead><tr><th>Bloque</th><th>Tarea</th><th>Tipo</th><th>Cliente</th><th>Entrega</th><th class="right">Monto</th></tr></thead>
+      <h3>Bloques y cobros</h3>
+      <table><thead><tr><th>Bloque</th><th>Proyecto</th><th>Cliente</th><th>Estado</th><th class="right">Cobrable</th></tr></thead>
       <tbody>
-      ${delivered.length?delivered.map(t=>{
-        const pv=money(t.price);
-        const tq=truequeAmt(t), cash=cashOwed(t);
-        const bc=blockColor(t.bloque);
-        const cl=clientOf(t.etapa);
-        const tag = (tq>0&&cash>0)?'<span class="tag tr">trueque '+fm(tq)+'</span>':(tq>0?'<span class="tag tr">trueque</span>':'');
-        const amtCell = pv==null ? '<span class="muted">'+esc(t.price||'—')+'</span>'
-          : (cash>0 ? fm(cash) : '<span class="muted">'+fm(0)+'</span>');
-        return `<tr class="${cash>0?'':'settled'}">
-          <td>${t.bloque?`<span class="blk" style="background:${bc.bg};color:${bc.fg}">${esc(t.bloque)}</span>`:'<span class="muted">—</span>'}</td>
-          <td>${esc(t.titulo)}${tag}</td>
-          <td class="muted">${esc(typeOf(t.etapa))}</td>
+      ${blocks.length?blocks.map(b=>{
+        const bc=blockColor(b.bloque);const cl=clientOf(b.etapa);const done=b.agg.done;
+        const tqtag=b.agg.tq>0?`<span class="tag tr">trueque ${fm(b.agg.tq)}</span>`:'';
+        const amt = b.agg.cash>0 ? (done?fm(b.agg.cash):`<span class="muted">${fm(b.agg.cash)} pend.</span>`) : (b.agg.tq>0?tqtag:'—');
+        return `<tr class="${done?'':'pending'}">
+          <td>${b.bloque?`<span class="blk" style="background:${bc.bg};color:${bc.fg}">${esc(b.bloque)}</span>`:'<span class="muted">—</span>'}</td>
+          <td class="muted">${esc(typeOf(b.etapa))}</td>
           <td><span class="cl ${cl==='TusCFO'?'cfo':'fer'}">${cl}</span></td>
-          <td class="muted">${pretty(t.due)}</td>
-          <td class="amt">${amtCell}</td>
-        </tr>`;}).join(''):'<tr><td colspan="6" class="muted">Aún no hay bloques entregados. Marca un ítem como “Entregado” en el cronograma.</td></tr>'}
+          <td>${done?'<span class="bstat done">✓ completo</span>':`<span class="bstat">${b.agg.doneCount}/${b.agg.total} tareas</span>`}</td>
+          <td class="amt">${done&&b.agg.tq>0&&b.agg.cash>0?tqtag+' ':''}${amt}</td>
+        </tr>`;}).join(''):'<tr><td colspan="5" class="muted">No hay bloques con precio todavía.</td></tr>'}
       </tbody></table>
+      <div class="muted" style="font-size:11px;margin-top:8px">El monto de un bloque recién se factura cuando todas sus tareas están en “Entregado”.</div>
     </div>
 
     <div class="sec">
