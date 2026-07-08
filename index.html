@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: montos al bloque + titulos de bloque + compactar + items limpios (v4) -->
+<!-- build: sin reiniciar + puntos de restauracion + guardado al cerrar (v6) -->
 <html lang="es">
 <head>
 <meta charset="utf-8"/>
@@ -38,6 +38,16 @@ button.primary{background:var(--accent2);border-color:var(--accent2);color:#fff;
 .proj{margin-bottom:18px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
 .proj-h{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;background:var(--panel2)}
 .proj-h h2{font-size:14px;margin:0;font-weight:650;flex:1}
+.proj-title{flex:1;min-width:120px;background:transparent;border:1px solid transparent;border-radius:6px;
+  padding:4px 8px;color:var(--txt);font-size:14px;font-weight:650}
+.proj-title:hover{border-color:var(--line)}
+.proj-title:focus{border-color:var(--accent);background:var(--panel2);outline:none}
+.gbtn{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:6px;
+  padding:2px 8px;font-size:13px;cursor:pointer}
+.gbtn:hover{border-color:var(--accent);color:var(--accent)}
+.bdel{background:transparent;border:none;color:#5a6474;cursor:pointer;font-size:13px;padding:2px 6px;flex-shrink:0}
+.bdel:hover{color:var(--danger)}
+.blockaddtask{margin:6px 14px 10px}
 .proj-h .caret{color:var(--muted);transition:.2s}
 .proj.collapsed .caret{transform:rotate(-90deg)}
 .proj.collapsed .items{display:none}
@@ -184,6 +194,7 @@ tr.settled td.amt{color:var(--trueque)}
 .hflag{margin-right:5px}
 .hcountry{font-size:11px;color:var(--muted);margin-left:4px}
 .haction{flex:1;color:var(--txt)}
+.restorebtn{flex-shrink:0;font-size:11px;padding:3px 10px}
 .hempty{padding:30px;text-align:center;color:var(--muted)}
 .hfilter{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 </style>
@@ -212,7 +223,6 @@ tr.settled td.amt{color:var(--trueque)}
     <button class="ghost" id="compact" title="Compactar / expandir bloques">⊟ Bloques</button>
     <button class="ghost" id="expcsv">CSV</button>
     <button class="ghost" id="expjson">JSON</button>
-    <button class="ghost danger" id="reset">Reiniciar</button>
   </div>
   <div class="tabs">
     <div class="tab active" data-tab="crono">Cronograma</div>
@@ -350,9 +360,57 @@ function deleteItem(t){
   logChange('Eliminó "'+t.titulo+'"');
   structuralCommit();toast('Ítem eliminado');
 }
+/* bloques: añadir / eliminar */
+function nextBloque(etapa){
+  const nums=tasks.filter(t=>t.etapa===etapa).map(t=>{const m=/(\d+)/.exec(t.bloque||'');return m?parseInt(m[1]):-1;});
+  return 'B'+((nums.length?Math.max(...nums):-1)+1);
+}
+function addItemToBlock(etapa,bloque,title){
+  const maxId=tasks.reduce((m,t)=>Math.max(m,t.id),0);
+  const grp=tasks.filter(t=>t.etapa===etapa).sort((a,b)=>a.order-b.order);
+  const blkItems=grp.filter(t=>(t.bloque||'')===(bloque||''));
+  const afterOrder=blkItems.length?blkItems[blkItems.length-1].order
+    :(grp.length?grp[grp.length-1].order:(tasks.length?Math.max(...tasks.map(t=>t.order)):-1));
+  const nt={id:maxId+1,etapa,bloque:bloque||'',semana:'',titulo:title||'Nueva tarea',
+    start:'',due:'',duration:7,done:false,status:'todo',settled:false,
+    price:'',valini:'',valpost:'',pago:'',details:[],order:afterOrder+0.5};
+  tasks.push(nt);openItems[nt.id]=true;
+  logChange('Añadió '+(blkItems.length?'tarea al bloque '+bloque:'bloque '+bloque)+' en '+shortProj(etapa));
+  structuralCommit();toast(blkItems.length?'Tarea añadida':'Bloque añadido');
+}
+function addBlock(etapa){addItemToBlock(etapa,nextBloque(etapa),'Nueva tarea');}
+function deleteBlock(etapa,bloque){
+  const n=tasks.filter(t=>t.etapa===etapa&&(t.bloque||'')===(bloque||'')).length;
+  if(!n)return;
+  if(!confirm('¿Eliminar el bloque '+(bloque||'(sin bloque)')+' y sus '+n+' tarea(s)? Recalcula las fechas.'))return;
+  for(let i=tasks.length-1;i>=0;i--){if(tasks[i].etapa===etapa&&(tasks[i].bloque||'')===(bloque||''))tasks.splice(i,1);}
+  if(STATE.blockTitles)delete STATE.blockTitles[blockKey(etapa,bloque)];
+  logChange('Eliminó el bloque '+(bloque||'')+' de '+shortProj(etapa));
+  structuralCommit();toast('Bloque eliminado');
+}
 
 /* status of item */
 function stItem(t){return t.status||'todo';}
+
+/* grupos (etapas): renombrar y reordenar */
+function groupOrder(){const seen=[];[...tasks].sort((a,b)=>a.order-b.order).forEach(t=>{if(!seen.includes(t.etapa))seen.push(t.etapa);});return seen;}
+function renameGroup(oldE,newE){
+  newE=(newE||'').trim();if(!newE||newE===oldE)return;
+  tasks.forEach(t=>{if(t.etapa===oldE)t.etapa=newE;});
+  if(STATE.blockTitles){const nt={};Object.keys(STATE.blockTitles).forEach(k=>{
+    if(k.indexOf(oldE+'||')===0)nt[newE+'||'+k.slice((oldE+'||').length)]=STATE.blockTitles[k];else nt[k]=STATE.blockTitles[k];});
+    STATE.blockTitles=nt;}
+  if(collapsed[oldE]!==undefined){collapsed[newE]=collapsed[oldE];delete collapsed[oldE];}
+  logChange('Renombró grupo "'+oldE+'" → "'+newE+'"');save();render();
+}
+function moveGroup(etapa,dir){
+  const groups=groupOrder();const i=groups.indexOf(etapa),j=i+dir;
+  if(j<0||j>=groups.length)return;
+  const tmp=groups[i];groups[i]=groups[j];groups[j]=tmp;
+  let n=0;groups.forEach(g=>{tasks.filter(t=>t.etapa===g).sort((a,b)=>a.order-b.order).forEach(t=>{t.order=n++;});});
+  logChange('Movió el grupo "'+shortProj(etapa)+'" '+(dir<0?'arriba':'abajo'));
+  save();render();
+}
 
 /* ---------- bloques: el precio es POR BLOQUE ---------- */
 // agrupa ítems consecutivos con el mismo bloque (ya ordenados)
@@ -394,13 +452,19 @@ function renderCrono(){
     const gt=seen[g], dn=gt.filter(t=>stItem(t)==='entregado').length;
     const pj=document.createElement('div');pj.className='proj'+(collapsed[g]?' collapsed':'');
     pj.innerHTML=`<div class="proj-h" data-g="${esc(g)}">
-      <span class="caret">▾</span><h2>${esc(g)}</h2>
-      <span class="pm">${dn}/${gt.length} entregados</span></div>
+      <span class="caret">▾</span>
+      <input class="proj-title" data-gtitle value="${esc(g)}"/>
+      <span class="pm">${dn}/${gt.length} entregados</span>
+      <button class="gbtn" data-gup title="Subir grupo">↑</button>
+      <button class="gbtn" data-gdown title="Bajar grupo">↓</button></div>
       <div class="items"></div>
-      <button class="additem" data-addto="${esc(g)}">+ Añadir ítem a ${esc(g)}</button>`;
+      <button class="additem" data-addto="${esc(g)}">+ Añadir bloque a ${esc(g)}</button>`;
     const box=pj.querySelector('.items');
     chunkBlocks(gt).forEach(blk=>box.appendChild(blockEl(blk)));
-    pj.querySelector('[data-addto]').addEventListener('click',()=>addItem(g));
+    pj.querySelector('[data-addto]').addEventListener('click',()=>addBlock(g));
+    pj.querySelector('[data-gtitle]').addEventListener('change',e=>{const nv=e.target.value.trim();if(nv&&nv!==g)renameGroup(g,nv);});
+    pj.querySelector('[data-gup]').addEventListener('click',()=>moveGroup(g,-1));
+    pj.querySelector('[data-gdown]').addEventListener('click',()=>moveGroup(g,1));
     root.appendChild(pj);
   });
 }
@@ -424,13 +488,19 @@ function blockEl(blk){
       ${blk.bloque?`<span class="blk" style="background:${bc.bg};color:${bc.fg}">${esc(blk.bloque)}</span>`:'<span class="muted" style="font-size:11px">sin bloque</span>'}
       <input class="block-title" data-btitle placeholder="Título del bloque…" value="${esc(blockTitle(etapa,blk.bloque))}"/>
       ${priceInfo}<span class="spc2"></span>${stat}
+      <button class="bdel" data-bdel title="Eliminar bloque">🗑</button>
     </div><div class="block-items"></div>`;
   const bi=wrap.querySelector('.block-items');
   blk.items.forEach(t=>bi.appendChild(itemEl(t)));
+  const addT=document.createElement('button');
+  addT.className='subadd blockaddtask';addT.textContent='+ tarea al bloque';
+  addT.addEventListener('click',()=>addItemToBlock(etapa,blk.bloque,'Nueva tarea'));
+  bi.appendChild(addT);
   wrap.querySelector('.block-h').addEventListener('click',e=>{
-    if(e.target.closest('input'))return;
+    if(e.target.closest('input,button'))return;
     blockCollapsed[key]=!blockCollapsed[key];renderCrono();
   });
+  wrap.querySelector('[data-bdel]').addEventListener('click',e=>{e.stopPropagation();deleteBlock(etapa,blk.bloque);});
   const ti=wrap.querySelector('[data-btitle]');
   let bwas=blockTitle(etapa,blk.bloque);
   ti.addEventListener('input',e=>{if(!STATE.blockTitles)STATE.blockTitles={};STATE.blockTitles[key]=e.target.value;save();});
@@ -705,18 +775,47 @@ function clientOf(e){return /tuscfo/i.test(e||'')?'TusCFO':'Fer';}
 /* ---------- historial ---------- */
 function flag(cc){if(!cc||cc.length!==2)return '🏳️';try{return String.fromCodePoint(...[...cc.toUpperCase()].map(c=>127397+c.charCodeAt(0)));}catch(e){return '🏳️';}}
 function histWhen(ts){const d=new Date(ts);return d.toLocaleString('es-ES',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});}
+let snapshots=[];
+async function loadSnapshots(){
+  if(sync.mode!=='server')return;
+  try{const r=await fetch('/api/data?snapshots=1',{headers:{'x-app-pass':session.pass}});
+    const j=await r.json();if(j&&j.ok)snapshots=j.snapshots||[];}catch(e){}
+}
+async function restoreTo(version){
+  if(!confirm('¿Restaurar todo al punto v'+version+'?\n\nEl estado actual se reemplaza por ese punto. Igual queda registrado en el historial, así que también podés volver atrás.'))return;
+  try{
+    const r=await fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json','x-app-pass':session.pass},
+      body:JSON.stringify({password:session.pass,name:session.name,restore:version})});
+    const res=await r.json();
+    if(res&&res.ok){setState(res);cacheLocal();await loadSnapshots();render();toast('Restaurado al punto v'+version);}
+    else toast(res&&res.error?res.error:'No se pudo restaurar');
+  }catch(e){toast('Error al restaurar');}
+}
 function renderHistorial(){
   const root=document.getElementById('historial');
   const q=document.getElementById('search').value.toLowerCase().trim();
   let h=[...(STATE.history||[])].reverse();
   if(q)h=h.filter(e=>((e.name||'')+' '+(e.action||'')+' '+(e.country||'')).toLowerCase().includes(q));
-  root.innerHTML=`<div class="sec"><h3>Historial de cambios ${sync.mode!=='server'?'· local (no compartido)':''} <span class="muted" style="font-weight:400">— ${STATE.history?STATE.history.length:0} registros</span></h3>
+  const snaps=[...snapshots].reverse();
+  const restoreSec = sync.mode==='server' ? `
+    <div class="sec">
+      <h3>Puntos de restauración <span class="muted" style="font-weight:400">— podés volver a cualquiera</span></h3>
+      <div class="hist">${snaps.length?snaps.map(s=>`
+        <div class="hitem">
+          <span class="hwhen">${histWhen(s.ts)}</span>
+          <span class="hwho">v${s.version} · ${esc(s.name||'—')}</span>
+          <span class="haction">${esc(s.action||'')}</span>
+          <button class="gbtn restorebtn" data-restore="${s.version}">↩ Restaurar</button>
+        </div>`).join(''):'<div class="hempty">Se van guardando a medida que hay cambios.</div>'}</div>
+    </div>` : '';
+  root.innerHTML=restoreSec+`<div class="sec"><h3>Historial de cambios ${sync.mode!=='server'?'· local (no compartido)':''} <span class="muted" style="font-weight:400">— ${STATE.history?STATE.history.length:0} registros</span></h3>
     <div class="hist">${h.length?h.map(e=>`
       <div class="hitem">
         <span class="hwhen">${histWhen(e.ts)}</span>
         <span class="hwho">${esc(e.name||'—')}<span class="hcountry">${e.country?flag(e.country)+' '+esc(e.country):''}</span></span>
         <span class="haction">${esc(e.action||'')}</span>
       </div>`).join(''):'<div class="hempty">Todavía no hay cambios registrados.</div>'}</div></div>`;
+  root.querySelectorAll('[data-restore]').forEach(b=>b.addEventListener('click',()=>restoreTo(+b.dataset.restore)));
 }
 
 /* ---------- sync layer ---------- */
@@ -758,7 +857,7 @@ async function pushSync(){
   try{
     const res=await apiPost(entries);
     if(res&&res.ok){sync.version=res.version;STATE.history=res.history||STATE.history;sync.dirty=false;okFlag=true;
-      setSyncUI('on');cacheLocal();if(tab==='historial')renderHistorial();}
+      setSyncUI('on');cacheLocal();if(tab==='historial')loadSnapshots().then(()=>{if(tab==='historial')renderHistorial();});}
     else{pendingEntries.unshift(...entries);setSyncUI('off');}
   }catch(e){pendingEntries.unshift(...entries);setSyncUI('off');}
   sync.busy=false;
@@ -847,11 +946,6 @@ function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;'
 document.getElementById('search').addEventListener('input',()=>{if(tab==='crono')renderCrono();else if(tab==='historial')renderHistorial();});
 document.getElementById('expjson').addEventListener('click',exportJSON);
 document.getElementById('expcsv').addEventListener('click',exportCSV);
-document.getElementById('reset').addEventListener('click',()=>{
-  if(!confirm('¿Reiniciar tareas y pagos a los datos originales? Esto afecta a todos. El historial se conserva.'))return;
-  setState({tasks:initTasks(ORIGINAL),payments:[],blockTitles:STATE.blockTitles,history:STATE.history,version:sync.version});
-  logChange('Reinició el plan a los datos originales');save();render();toast('Reiniciado');
-});
 document.getElementById('compact').addEventListener('click',()=>{
   const keys=[];[...new Set(tasks.map(t=>t.etapa))].forEach(e=>{
     const items=tasks.filter(t=>t.etapa===e).sort((a,b)=>a.order-b.order);
@@ -863,12 +957,30 @@ document.getElementById('compact').addEventListener('click',()=>{
 });
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');
-  tab=b.dataset.tab;render();}));
+  tab=b.dataset.tab;render();
+  if(tab==='historial'&&sync.mode==='server'){loadSnapshots().then(()=>{if(tab==='historial')renderHistorial();});}
+}));
 document.getElementById('crono').addEventListener('click',e=>{
-  const h=e.target.closest('.proj-h');if(h){collapsed[h.dataset.g]=!collapsed[h.dataset.g];renderCrono();}});
+  const h=e.target.closest('.proj-h');
+  if(h&&!e.target.closest('input,button')){collapsed[h.dataset.g]=!collapsed[h.dataset.g];renderCrono();}});
 document.getElementById('lg-btn').addEventListener('click',doLogin);
 document.getElementById('lg-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 document.getElementById('lg-name').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('lg-pass').focus();});
+
+/* Red de seguridad: si cerrás/ocultás la pestaña, forzamos el guardado de lo pendiente */
+function flushBeacon(){
+  if(sync.mode!=='server')return;
+  if(!sync.dirty&&!pendingEntries.length)return;
+  try{
+    const body=JSON.stringify({password:session.pass,name:session.name,tasks:STATE.tasks,payments:STATE.payments,blockTitles:STATE.blockTitles,entries:pendingEntries.splice(0)});
+    if(navigator.sendBeacon)navigator.sendBeacon('/api/data',new Blob([body],{type:'application/json'}));
+    else fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json'},body,keepalive:true});
+    sync.dirty=false;cacheLocal();
+  }catch(e){}
+}
+window.addEventListener('pagehide',flushBeacon);
+window.addEventListener('beforeunload',flushBeacon);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushBeacon();});
 boot();
 </script>
 </body>
