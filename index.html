@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: sin reiniciar + puntos de restauracion + guardado al cerrar (v6) -->
+<!-- build: bloques compactos por defecto al abrir (v7) -->
 <html lang="es">
 <head>
 <meta charset="utf-8"/>
@@ -474,7 +474,8 @@ function blockEl(blk){
   const bc=blockColor(blk.bloque);
   const etapa=blk.items[0]?blk.items[0].etapa:'';
   const key=blockKey(etapa,blk.bloque);
-  const isColl=!!blockCollapsed[key];
+  const q=document.getElementById('search').value.trim();
+  const isColl = q ? false : ((key in blockCollapsed) ? blockCollapsed[key] : true); // compacto por defecto
   const wrap=document.createElement('div');
   wrap.className='block'+(agg.done?' bdone':'')+(isColl?' bcollapsed':'');
   const priceInfo = (agg.hasPrice||agg.tq>0)
@@ -950,7 +951,8 @@ document.getElementById('compact').addEventListener('click',()=>{
   const keys=[];[...new Set(tasks.map(t=>t.etapa))].forEach(e=>{
     const items=tasks.filter(t=>t.etapa===e).sort((a,b)=>a.order-b.order);
     chunkBlocks(items).forEach(blk=>keys.push(blockKey(e,blk.bloque)));});
-  const anyOpen=keys.some(k=>!blockCollapsed[k]);
+  const isOpen=k=>(k in blockCollapsed)?!blockCollapsed[k]:false; // default colapsado
+  const anyOpen=keys.some(isOpen);
   keys.forEach(k=>blockCollapsed[k]=anyOpen);
   if(tab!=='crono'){tab='crono';document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab==='crono'));}
   render();
