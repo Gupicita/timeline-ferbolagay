@@ -83,12 +83,28 @@ button.primary{background:var(--accent2);border-color:var(--accent2);color:#fff;
 .delay{display:flex;gap:6px;align-items:flex-end}
 .subgroup{margin-top:12px}
 .subgroup h4{margin:0 0 5px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
-.sub{display:flex;gap:8px;align-items:flex-start;padding:3px 0;font-size:13px}
-.sub input[type=checkbox]{margin-top:2px;accent-color:var(--done);cursor:pointer}
-.sub.done span{text-decoration:line-through;color:var(--muted)}
-.sub .sd{font-size:10px;color:var(--muted);white-space:nowrap;margin-top:1px}
-.priceline{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px;
+.sub{display:flex;gap:8px;align-items:center;padding:2px 0;font-size:13px}
+.sub input[type=checkbox]{accent-color:var(--done);cursor:pointer;flex-shrink:0}
+.subtext{flex:1;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 7px;color:var(--txt);font-size:13px}
+.subtext:hover{border-color:var(--line)}
+.subtext:focus{border-color:var(--accent);background:var(--panel2)}
+.sub.done .subtext{text-decoration:line-through;color:var(--muted)}
+.sub .sd{font-size:10px;color:var(--muted);white-space:nowrap;flex-shrink:0}
+.subdel{background:transparent;border:none;color:#5a6474;cursor:pointer;font-size:12px;padding:2px 6px;flex-shrink:0}
+.subdel:hover{color:var(--danger)}
+.subadd{margin-top:4px;background:transparent;border:1px dashed var(--line);color:var(--muted);border-radius:7px;padding:5px 9px;font-size:11px;font-weight:600}
+.subadd:hover{border-color:var(--accent);color:var(--accent)}
+.notesbox{margin-top:12px}
+.notesbox label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px}
+.notesbox textarea{width:100%;min-height:46px;resize:vertical;background:var(--panel2);border:1px solid var(--line);
+  border-radius:8px;color:var(--txt);padding:8px;font-family:inherit;font-size:13px}
+.notesbox textarea:focus{border-color:var(--accent);outline:none}
+.priceline{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-top:12px;
   border-top:1px dashed var(--line);padding-top:12px}
+.cashnote{font-size:12px;color:var(--muted)}.cashnote b{color:var(--cash)}
+.chip-mix{font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;flex-shrink:0;
+  background:#241f36;color:#b6a0ff}
+.price-tag.mix{color:#b6a0ff}
 .toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);user-select:none;cursor:pointer}
 .moved{color:var(--prog);font-size:11px}
 
@@ -243,27 +259,32 @@ function fm(v){return '$'+v.toLocaleString('en-US',{minimumFractionDigits:0,maxi
 const STLABEL={todo:'Por hacer',prog:'En progreso',entregado:'Entregado'};
 
 /* cascade */
-function shiftFollowing(order,n){if(!n)return;tasks.forEach(t=>{if(t.order>order){t.start=addDays(t.start,n);t.due=addDays(t.due,n);}});}
-function setStart(t,v){const d=diffDays(v,t.start);t.start=v;t.due=addDays(v,t.duration-1);if(cascadeOn())shiftFollowing(t.order,d);logChange('Cambió inicio de "'+t.titulo+'" → '+v+(cascadeOn()&&d?' (empujó '+d+'d las siguientes)':''));commit();}
-function setDue(t,v){const old=t.due;t.due=v;t.duration=Math.max(1,diffDays(v,t.start)+1);const d=diffDays(v,old);if(cascadeOn())shiftFollowing(t.order,d);logChange('Cambió entrega de "'+t.titulo+'" → '+v+(cascadeOn()&&d?' (empujó '+d+'d las siguientes)':''));commit();}
-function setDur(t,v){v=Math.max(1,parseInt(v)||1);const old=t.due;t.duration=v;t.due=addDays(t.start,v-1);const d=diffDays(t.due,old);if(cascadeOn())shiftFollowing(t.order,d);logChange('Cambió duración de "'+t.titulo+'" a '+v+' días');commit();}
-function delayBy(t,n){n=parseInt(n)||0;if(!n)return;t.start=addDays(t.start,n);t.due=addDays(t.due,n);if(cascadeOn())shiftFollowing(t.order,n);logChange('Retrasó "'+t.titulo+'" '+(n>0?'+':'')+n+' días'+(cascadeOn()?' con las siguientes':''));commit();toast((n>0?'+':'')+n+' días');}
+// timings only cascade WITHIN the same group (etapa); never across projects
+function shiftFollowing(t,n){if(!n)return;tasks.forEach(x=>{if(x.etapa===t.etapa&&x.order>t.order){x.start=addDays(x.start,n);x.due=addDays(x.due,n);}});}
+function setStart(t,v){const d=diffDays(v,t.start);t.start=v;t.due=addDays(v,t.duration-1);if(cascadeOn())shiftFollowing(t,d);logChange('Cambió inicio de "'+t.titulo+'" → '+v+(cascadeOn()&&d?' (empujó '+d+'d las siguientes del grupo)':''));commit();}
+function setDue(t,v){const old=t.due;t.due=v;t.duration=Math.max(1,diffDays(v,t.start)+1);const d=diffDays(v,old);if(cascadeOn())shiftFollowing(t,d);logChange('Cambió entrega de "'+t.titulo+'" → '+v+(cascadeOn()&&d?' (empujó '+d+'d las siguientes del grupo)':''));commit();}
+function setDur(t,v){v=Math.max(1,parseInt(v)||1);const old=t.due;t.duration=v;t.due=addDays(t.start,v-1);const d=diffDays(t.due,old);if(cascadeOn())shiftFollowing(t,d);logChange('Cambió duración de "'+t.titulo+'" a '+v+' días');commit();}
+function delayBy(t,n){n=parseInt(n)||0;if(!n)return;t.start=addDays(t.start,n);t.due=addDays(t.due,n);if(cascadeOn())shiftFollowing(t,n);logChange('Retrasó "'+t.titulo+'" '+(n>0?'+':'')+n+' días'+(cascadeOn()?' con las siguientes del grupo':''));commit();toast((n>0?'+':'')+n+' días');}
 function cascadeOn(){return document.getElementById('cascade').checked;}
 function commit(){save();render();}
 
 /* structural: reorder / add / delete  -> reflow contiguous dates */
 function renumber(){[...tasks].sort((a,b)=>a.order-b.order).forEach((t,i)=>t.order=i);}
 function reflow(){
-  const ord=[...tasks].sort((a,b)=>a.order-b.order);
-  if(!ord.length)return;
-  // anchor timeline at the earliest existing start so it never drifts
-  const anchor=tasks.reduce((m,t)=>(t.start&&(!m||t.start<m))?t.start:m,null);
-  ord[0].start=anchor||ord[0].start||fmt(new Date());
-  ord[0].due=addDays(ord[0].start,ord[0].duration-1);
-  for(let i=1;i<ord.length;i++){
-    ord[i].start=addDays(ord[i-1].due,1);
-    ord[i].due=addDays(ord[i].start,ord[i].duration-1);
-  }
+  // re-chain contiguous dates INDEPENDENTLY per group (etapa); groups never affect each other
+  const byEtapa={};
+  tasks.forEach(t=>{(byEtapa[t.etapa]=byEtapa[t.etapa]||[]).push(t);});
+  Object.values(byEtapa).forEach(arr=>{
+    arr.sort((a,b)=>a.order-b.order);
+    if(!arr.length)return;
+    const anchor=arr.reduce((m,t)=>(t.start&&(!m||t.start<m))?t.start:m,null);
+    arr[0].start=anchor||arr[0].start||fmt(new Date());
+    arr[0].due=addDays(arr[0].start,arr[0].duration-1);
+    for(let i=1;i<arr.length;i++){
+      arr[i].start=addDays(arr[i-1].due,1);
+      arr[i].due=addDays(arr[i].start,arr[i].duration-1);
+    }
+  });
 }
 function structuralCommit(){renumber();reflow();save();render();}
 
@@ -355,19 +376,40 @@ function blockColor(b){
   const fg = light>56 ? 'hsl(262,60%,20%)' : 'hsl(262,65%,92%)';
   return {bg,fg};
 }
+/* trueque parcial: parte se salda por trueque, el resto es efectivo cobrable */
+function truequeAmt(t){
+  if(t.truequeAmount!==undefined&&t.truequeAmount!==null&&String(t.truequeAmount).trim()!=='')return money(t.truequeAmount)||0;
+  return t.settled?(money(t.price)||0):0;   // compat con datos viejos (checkbox saldado)
+}
+function truequeVal(t){
+  if(t.truequeAmount!==undefined&&t.truequeAmount!==null&&String(t.truequeAmount).trim()!=='')return t.truequeAmount;
+  return t.settled?(t.price||''):'';
+}
+function cashOwed(t){const p=money(t.price);if(p==null)return null;return Math.max(0,p-truequeAmt(t));}
+
+/* sub-tareas: agregar / borrar */
+function addSub(t,label){t.details.push({label:label,text:'Nueva sub-tarea',done:false,date:null});
+  logChange('Añadió sub-tarea ('+label+') en "'+t.titulo+'"');commit();}
+function delSub(t,i){if(!t.details[i])return;t.details.splice(i,1);
+  logChange('Eliminó sub-tarea de "'+t.titulo+'"');commit();}
+
 function itemEl(t){
   const st=stItem(t);
   const orig=ORIGINAL.find(x=>x.id===t.id);
   const moved=orig&&orig.due!==t.due;
   const pv=money(t.price);
   const bc=blockColor(t.bloque);
-  const hasCash=pv!=null&&pv>0;
+  const tq=truequeAmt(t), cash=cashOwed(t);
   const el=document.createElement('div');
   el.className='item'+(openItems[t.id]?' open':'');
   const priceTag = pv!=null?(pv>0?fm(pv):'—'):(t.price?'<span class="muted" style="font-size:11px">'+esc(t.price)+'</span>':'');
-  const payChip = hasCash ? (t.settled
-      ? `<span class="chip-tr" title="Saldado con trueque/servicio">⇄ trueque</span>`
-      : `<span class="chip-cash" title="Se cobra en efectivo">$ efectivo</span>`) : '';
+  let payChip='';
+  if(pv!=null&&pv>0){
+    if(tq>0&&cash>0) payChip=`<span class="chip-mix" title="Trueque ${fm(tq)} · Efectivo ${fm(cash)}">⇄ ${fm(tq)} + ${fm(cash)}</span>`;
+    else if(tq>0) payChip=`<span class="chip-tr" title="Saldado con trueque/servicio">⇄ trueque</span>`;
+    else payChip=`<span class="chip-cash" title="Se cobra en efectivo">$ efectivo</span>`;
+  }
+  const priceCls = (tq>0&&cash>0) ? 'mix' : (tq>0 ? 'trueque' : '');
   el.innerHTML=`
     <div class="item-row" draggable="true" data-id="${t.id}">
       <span class="drag" title="Arrastrar para reordenar">⠿</span>
@@ -375,7 +417,7 @@ function itemEl(t){
       ${t.bloque?`<span class="blk" style="background:${bc.bg};color:${bc.fg}" title="Bloque ${esc(t.bloque)} — las tareas del mismo bloque se cobran juntas">${esc(t.bloque)}</span>`:''}
       <span class="item-title">${esc(t.titulo)}</span>
       ${payChip}
-      <span class="price-tag ${t.settled?'trueque':''}">${priceTag}</span>
+      <span class="price-tag ${priceCls}">${priceTag}</span>
       <span class="item-date">${pretty(t.due)}</span>
       <span class="pill ${st}">${STLABEL[st]}</span>
       <span class="icaret">▶</span>
@@ -397,9 +439,14 @@ function itemEl(t){
       </div>
       ${moved?`<div class="moved">Movido ${diffDays(t.due,orig.due)>0?'+':''}${diffDays(t.due,orig.due)} días · original ${pretty(orig.due)}</div>`:''}
       ${subGroups(t)}
+      <div class="notesbox">
+        <label>Notas</label>
+        <textarea data-notes placeholder="Notas de esta tarea…">${esc(t.notes||'')}</textarea>
+      </div>
       <div class="priceline">
         <div class="field"><label>Precio del bloque</label><input class="money-in" data-price value="${esc(t.price||'')}" placeholder="—"/></div>
-        <label class="toggle"><input type="checkbox" data-settled ${t.settled?'checked':''}/> Saldado (trueque/servicio, no suma a deuda)</label>
+        <div class="field"><label>Cubierto por trueque</label><input class="money-in" data-trueque value="${esc(truequeVal(t))}" placeholder="0"/></div>
+        <span class="cashnote">Cobrable en efectivo: <b>${cashOwed(t)!=null?fm(cashOwed(t)):'—'}</b></span>
         ${t.pago?`<span class="muted" style="font-size:11px">nota original: ${esc(t.pago)}</span>`:''}
       </div>
       <div class="detbtns">
@@ -449,12 +496,23 @@ function itemEl(t){
   el.querySelector('[data-price]').addEventListener('input',e=>{t.price=e.target.value;save();});
   el.querySelector('[data-price]').addEventListener('change',e=>{
     if((e.target.value||'')!==priceWas){logChange('Cambió precio de "'+t.titulo+'" → '+(e.target.value||'—'));priceWas=e.target.value||'';save();}render();});
-  el.querySelector('[data-settled]').addEventListener('change',e=>{t.settled=e.target.checked;
-    logChange((e.target.checked?'Marcó saldado (trueque) ':'Quitó saldado de ')+'"'+t.titulo+'"');commit();});
+  let trueWas=String(truequeVal(t));
+  el.querySelector('[data-trueque]').addEventListener('input',e=>{t.truequeAmount=e.target.value;save();});
+  el.querySelector('[data-trueque]').addEventListener('change',e=>{
+    if(String(e.target.value)!==trueWas){logChange('Ajustó trueque de "'+t.titulo+'" → '+(e.target.value||'0'));trueWas=String(e.target.value);save();}render();});
+  const nb=el.querySelector('[data-notes]');let notesWas=t.notes||'';
+  nb.addEventListener('input',e=>{t.notes=e.target.value;save();});
+  nb.addEventListener('change',e=>{if((e.target.value||'')!==notesWas){logChange('Editó notas de "'+t.titulo+'"');notesWas=e.target.value||'';save();}});
   el.querySelectorAll('[data-det]').forEach(cb=>cb.addEventListener('change',e=>{
     const d=t.details[+e.target.dataset.det];d.done=e.target.checked;
-    logChange((e.target.checked?'Completó':'Desmarcó')+' sub-tarea de "'+t.titulo+'": '+d.text.slice(0,40));save();
+    logChange((e.target.checked?'Completó':'Desmarcó')+' sub-tarea de "'+t.titulo+'": '+(d.text||'').slice(0,40));save();
   }));
+  el.querySelectorAll('[data-dettext]').forEach(inp=>{
+    inp.addEventListener('input',e=>{t.details[+inp.dataset.dettext].text=e.target.value;save();});
+    inp.addEventListener('change',()=>logChange('Editó sub-tarea de "'+t.titulo+'"'));
+  });
+  el.querySelectorAll('[data-detdel]').forEach(b=>b.addEventListener('click',()=>delSub(t,+b.dataset.detdel)));
+  el.querySelectorAll('[data-addsub]').forEach(b=>b.addEventListener('click',()=>addSub(t,b.dataset.addsub)));
   return el;
 }
 
@@ -463,13 +521,14 @@ function subGroups(t){
   let html='';
   Object.keys(map).forEach(lab=>{
     const items=t.details.map((d,i)=>({d,i})).filter(o=>o.d.label===lab);
-    if(!items.length)return;
     html+=`<div class="subgroup"><h4>${map[lab]}</h4>`+items.map(o=>`
       <div class="sub ${o.d.done?'done':''}">
         <input type="checkbox" data-det="${o.i}" ${o.d.done?'checked':''}/>
-        <span>${esc(o.d.text)}</span>
+        <input class="subtext" data-dettext="${o.i}" value="${esc(o.d.text)}"/>
         ${o.d.date?`<span class="sd">${pretty(o.d.date)}</span>`:''}
-      </div>`).join('')+`</div>`;
+        <button class="subdel" data-detdel="${o.i}" title="Eliminar sub-tarea">✕</button>
+      </div>`).join('')+
+      `<button class="subadd" data-addsub="${lab}">+ añadir ${lab==='Entrega'?'entregable':(lab==='Reunión'?'reunión':lab)}</button></div>`;
   });
   return html;
 }
@@ -480,18 +539,19 @@ function renderCuenta(){
   document.getElementById('cuenta').classList.remove('hidden');
   const root=document.getElementById('cuenta');
   const delivered=tasks.filter(t=>stItem(t)==='entregado');
-  const billable=delivered.filter(t=>!t.settled&&money(t.price)!=null);
-  const owed=billable.reduce((s,t)=>s+money(t.price),0);
+  const billable=delivered.filter(t=>cashOwed(t)!=null&&cashOwed(t)>0);
+  const owed=billable.reduce((s,t)=>s+cashOwed(t),0);
+  const truequeTotal=delivered.reduce((s,t)=>s+truequeAmt(t),0);
   const paid=STATE.payments.reduce((s,p)=>s+(money(p.amount)||0),0);
   const bal=owed-paid;
   const balCls=bal>0.005?'debe':(bal<-0.005?'favor':'aldia');
   const balTxt=bal>0.005?'Fer debe':(bal<-0.005?'Pagó de más':'Al día');
-  const settledCount=delivered.filter(t=>t.settled).length;
+  const settledCount=delivered.filter(t=>truequeAmt(t)>0).length;
 
   root.innerHTML=`
     <div class="summary">
-      <div class="scard"><div class="k">Facturado (entregado)</div><div class="v">${fm(owed)}</div>
-        <div class="sub2">${billable.length} bloques cobrables</div></div>
+      <div class="scard"><div class="k">Facturado en efectivo</div><div class="v">${fm(owed)}</div>
+        <div class="sub2">${billable.length} bloques cobrables${truequeTotal>0?` · ${fm(truequeTotal)} en trueque`:''}</div></div>
       <div class="scard"><div class="k">Pagado por Fer</div><div class="v">${fm(paid)}</div>
         <div class="sub2">${STATE.payments.length} pagos registrados</div></div>
       <div class="scard bal"><div class="k">Balance</div><div class="v ${balCls}">${fm(Math.abs(bal))}</div>
@@ -504,16 +564,19 @@ function renderCuenta(){
       <tbody>
       ${delivered.length?delivered.map(t=>{
         const pv=money(t.price);
-        const bill=!t.settled&&pv!=null;
+        const tq=truequeAmt(t), cash=cashOwed(t);
         const bc=blockColor(t.bloque);
         const cl=clientOf(t.etapa);
-        return `<tr class="${t.settled?'settled':''}">
+        const tag = (tq>0&&cash>0)?'<span class="tag tr">trueque '+fm(tq)+'</span>':(tq>0?'<span class="tag tr">trueque</span>':'');
+        const amtCell = pv==null ? '<span class="muted">'+esc(t.price||'—')+'</span>'
+          : (cash>0 ? fm(cash) : '<span class="muted">'+fm(0)+'</span>');
+        return `<tr class="${cash>0?'':'settled'}">
           <td>${t.bloque?`<span class="blk" style="background:${bc.bg};color:${bc.fg}">${esc(t.bloque)}</span>`:'<span class="muted">—</span>'}</td>
-          <td>${esc(t.titulo)}${t.settled?'<span class="tag tr">trueque</span>':''}</td>
+          <td>${esc(t.titulo)}${tag}</td>
           <td class="muted">${esc(typeOf(t.etapa))}</td>
           <td><span class="cl ${cl==='TusCFO'?'cfo':'fer'}">${cl}</span></td>
           <td class="muted">${pretty(t.due)}</td>
-          <td class="amt">${bill?fm(pv):(pv!=null?'<span class="muted">'+fm(pv)+'</span>':'<span class="muted">'+esc(t.price||'—')+'</span>')}</td>
+          <td class="amt">${amtCell}</td>
         </tr>`;}).join(''):'<tr><td colspan="6" class="muted">Aún no hay bloques entregados. Marca un ítem como “Entregado” en el cronograma.</td></tr>'}
       </tbody></table>
     </div>
