@@ -920,7 +920,7 @@ function startPoll(){
         setState(res);cacheLocal();render();toast('Actualizado con cambios de otros');}
       setSyncUI('on');
     }catch(e){setSyncUI('off');}
-  },6000);
+  },30000);
   window.addEventListener('focus',()=>{
     if(sync.mode==='server'&&!sync.dirty&&!pendingEntries.length&&!sync.busy){
       apiGet().then(res=>{if(res&&res.ok&&(res.version||0)>sync.version){setState(res);cacheLocal();render();}}).catch(()=>{});
